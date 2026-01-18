@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parmviewer"
+version = "0.1.0"
+description = "Desktop viewer for AMBER parm7 + rst7 files"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+  {name = "Parmviewer Contributors"}
+]
+dependencies = [
+  "MDAnalysis>=2.0",
+  "pywebview[qt]>=6.1",
+  "PyQt6>=6.5",
+  "qtpy>=2.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "pytest>=7.0",
+]
+
+[tool.setuptools]
+py-modules = ["app", "api", "model", "pdb_writer", "worker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
