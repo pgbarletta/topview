@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parm7 Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toolbar">
+    <button id="open-btn" type="button">Open parm7 + rst7</button>
+    <div class="path-inputs">
+      <input id="parm7-path" type="text" placeholder="parm7 path" />
+      <input id="rst7-path" type="text" placeholder="rst7 path" />
+      <button id="load-btn" type="button">Load</button>
+    </div>
+    <label class="toolbar-group">
+      Style
+      <select id="style-select">
+        <option value="sticks">Sticks</option>
+        <option value="spheres">Spheres</option>
+        <option value="lines">Lines</option>
+        <option value="ballstick">Ball + Stick</option>
+        <option value="cartoon_ligand">Cartoon + Ligand</option>
+      </select>
+    </label>
+    <button id="clear-btn" type="button">Clear selection</button>
+    <label class="toolbar-group">
+      Parm7 font (pt)
+      <input id="parm7-font-size" type="number" min="8" max="32" step="1" value="14" />
+    </label>
+    <button id="about-btn" type="button">About</button>
+    <button id="theme-btn" type="button">Dark mode</button>
+  </div>
+
+  <div id="status">
+    <span id="status-label">Idle</span>
+    <span id="status-detail"></span>
+  </div>
+
+  <div id="content">
+    <div id="viewer"></div>
+    <div id="info-panel">
+      <div id="info-header">
+        <div class="mode-header">
+          <h2 id="mode-title">Atom</h2>
+          <div id="mode-tabs">
+            <button class="mode-tab active" type="button" data-mode="Atom">Atom</button>
+            <button class="mode-tab" type="button" data-mode="Bond">Bond</button>
+            <button class="mode-tab" type="button" data-mode="Angle">Angle</button>
+            <button class="mode-tab" type="button" data-mode="Dihedral">Dihedral</button>
+            <button class="mode-tab" type="button" data-mode="1-4 Nonbonded">1-4 Nonbonded</button>
+            <button class="mode-tab" type="button" data-mode="Non-bonded">Non-bonded</button>
+          </div>
+        </div>
+      </div>
+      <div id="info-body">
+        <div id="atom-details">No atom selected.</div>
+        <div id="about-panel" class="hidden">
+          <h3>About charge and LJ</h3>
+          <div id="about-content">Select an atom to see the calculation details.</div>
+        </div>
+        <div id="parm7-panel">
+          <h3>Parm7</h3>
+          <div id="parm7-sections"></div>
+          <div id="parm7-view">No parm7 loaded.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
