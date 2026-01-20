@@ -236,27 +236,6 @@
 `daux/binderref_IDC-5270.rst7`
 - Sample rst7 coordinates; no functions.
 
-`dist/parmviewer-0.1.0-py3-none-any.whl`
-- Built wheel artifact; no functions.
-
-`dist/parmviewer-0.1.0.tar.gz`
-- Built source archive; no functions.
-
-`parmviewer.egg-info/PKG-INFO`
-- Package metadata; no functions.
-
-`parmviewer.egg-info/requires.txt`
-- Package requirements; no functions.
-
-`parmviewer.egg-info/top_level.txt`
-- Package metadata; no functions.
-
-`parmviewer.egg-info/dependency_links.txt`
-- Package metadata; no functions.
-
-`parmviewer.egg-info/SOURCES.txt`
-- Package file list; no functions.
-
 `__pycache__/model.cpython-312.pyc`
 - Python bytecode artifact; no functions.
 
