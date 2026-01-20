@@ -1,8 +1,10 @@
+"""PDB formatting utilities."""
+
+from __future__ import annotations
+
 from typing import Iterable, List
 
-
-class PdbWriterError(Exception):
-    pass
+from topview.errors import PdbWriterError
 
 
 def _format_atom_name(name: str) -> str:
@@ -29,18 +31,39 @@ def _format_element(element: str) -> str:
 
 
 def write_pdb(atom_metas: Iterable[object]) -> str:
+    """Build a PDB text block for a sequence of atom metadata.
+
+    Parameters
+    ----------
+    atom_metas
+        Iterable of AtomMeta-like objects with serial, atom_name, residue, coords, element.
+
+    Returns
+    -------
+    str
+        PDB text ending in a newline.
+
+    Raises
+    ------
+    PdbWriterError
+        If atom metadata is missing required attributes.
+    """
+
     lines: List[str] = []
     for meta in atom_metas:
-        serial = int(meta.serial)
-        name = _format_atom_name(meta.atom_name)
-        resname = _format_resname(meta.residue.resname)
-        chain = (meta.residue.chain or " ")[:1]
-        resid = int(meta.residue.resid)
-        x, y, z = meta.coords
+        try:
+            serial = int(meta.serial)
+            name = _format_atom_name(meta.atom_name)
+            resname = _format_resname(meta.residue.resname)
+            chain = (meta.residue.chain or " ")[:1]
+            resid = int(meta.residue.resid)
+            x, y, z = meta.coords
+            element = _format_element(meta.element)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PdbWriterError("pdb_format_failed", "Invalid atom metadata", str(exc)) from exc
+
         occ = 1.00
         temp = 0.00
-        element = _format_element(meta.element)
-
         line = (
             f"ATOM  "
             f"{serial:5d} "

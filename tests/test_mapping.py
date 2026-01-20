@@ -1,5 +1,5 @@
-from model import AtomMeta, ResidueMeta
-from pdb_writer import write_pdb
+from topview.model import AtomMeta, ResidueMeta
+from topview.services.pdb_writer import write_pdb
 
 
 def test_pdb_writer_serials_order():

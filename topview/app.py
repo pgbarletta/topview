@@ -1,20 +1,25 @@
+"""Topview application entrypoint."""
+
+from __future__ import annotations
+
 import argparse
 import logging
-import os
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 import webview
 
-from api import Api
-from model import Model
-from worker import Worker
+from topview import config
+from topview.bridge import Api
+from topview.logging_config import configure_logging
+from topview.model import Model
+from topview.worker import Worker
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_args(argv):
-    parser = argparse.ArgumentParser(description="Parm7 Viewer")
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=f"{config.APP_NAME}")
     parser.add_argument("parm7_path", nargs="?", help="Path to parm7/prmtop file")
     parser.add_argument("rst7_path", nargs="?", help="Path to rst7/inpcrd file")
     parser.add_argument(
@@ -27,7 +32,7 @@ def _parse_args(argv):
         "--info-font-size",
         dest="info_font_size",
         type=float,
-        default=13.0,
+        default=config.DEFAULT_INFO_FONT_SIZE,
         help="Font size (pt) for section info popups",
     )
     args = parser.parse_args(argv[1:])
@@ -38,25 +43,23 @@ def _parse_args(argv):
     return args
 
 
-def _configure_logging(log_file: Optional[str]) -> None:
-    handler = None
-    if log_file:
-        try:
-            handler = logging.FileHandler(log_file, encoding="utf-8")
-        except OSError as exc:
-            print(f"Failed to open log file '{log_file}': {exc}", file=sys.stderr)
-    if handler is None:
-        handler = logging.StreamHandler(sys.stdout)
-    logging.basicConfig(
-        level=logging.DEBUG,
-        handlers=[handler],
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+def create_app(
+    initial_paths: Optional[Tuple[str, str]] = None, info_font_size: float = config.DEFAULT_INFO_FONT_SIZE
+):
+    """Create the pywebview window and API bridge.
 
+    Parameters
+    ----------
+    initial_paths
+        Optional tuple of parm7 and rst7 paths.
+    info_font_size
+        Font size for section info popups.
 
-def create_app(initial_paths=None, info_font_size: float = 13.0):
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    index_path = os.path.join(base_dir, "web", "index.html")
+    Returns
+    -------
+    webview.Window
+        Configured pywebview window.
+    """
 
     worker = Worker(max_workers=1, max_processes=1)
     model = Model(cpu_submit=worker.submit_cpu)
@@ -68,10 +71,10 @@ def create_app(initial_paths=None, info_font_size: float = 13.0):
     )
 
     window = webview.create_window(
-        "Parm7 Viewer",
-        url=index_path,
-        width=1200,
-        height=800,
+        config.WINDOW_TITLE,
+        url=str(config.INDEX_PATH),
+        width=config.DEFAULT_WINDOW_WIDTH,
+        height=config.DEFAULT_WINDOW_HEIGHT,
         resizable=True,
         js_api=api,
         text_select=True,
@@ -80,9 +83,17 @@ def create_app(initial_paths=None, info_font_size: float = 13.0):
     return window
 
 
-def main():
+def main() -> None:
+    """Run the Topview application.
+
+    Returns
+    -------
+    None
+        This function does not return a value.
+    """
+
     args = _parse_args(sys.argv)
-    _configure_logging(args.log_file)
+    configure_logging(args.log_file)
     logger.debug("Starting application")
     initial_paths = None
     if args.parm7_path and args.rst7_path:

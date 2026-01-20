@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Parm7 Viewer</title>
+  <title>Topview</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -29,6 +29,10 @@
       Parm7 font (pt)
       <input id="parm7-font-size" type="number" min="8" max="32" step="1" value="14" />
     </label>
+    <label class="toolbar-group">
+      Info font (pt)
+      <input id="info-font-size" type="number" min="8" max="32" step="1" value="12" />
+    </label>
     <button id="about-btn" type="button">About</button>
     <button id="theme-btn" type="button">Dark mode</button>
   </div>
@@ -39,35 +43,55 @@
   </div>
 
   <div id="content">
-    <div id="viewer"></div>
-    <div id="info-panel">
-      <div id="info-header">
-        <div class="mode-header">
-          <h2 id="mode-title">Atom</h2>
-          <div id="mode-tabs">
-            <button class="mode-tab active" type="button" data-mode="Atom">Atom</button>
-            <button class="mode-tab" type="button" data-mode="Bond">Bond</button>
-            <button class="mode-tab" type="button" data-mode="Angle">Angle</button>
-            <button class="mode-tab" type="button" data-mode="Dihedral">Dihedral</button>
-            <button class="mode-tab" type="button" data-mode="1-4 Nonbonded">1-4 Nonbonded</button>
-            <button class="mode-tab" type="button" data-mode="Non-bonded">Non-bonded</button>
+    <div id="viewer-panel">
+      <div id="selection-panel">
+        <div id="info-header">
+          <div class="pane-title">selection</div>
+          <div class="mode-header">
+            <h2 id="mode-title">Atom</h2>
+            <div id="mode-tabs">
+              <button class="mode-tab active" type="button" data-mode="Atom">Atom</button>
+              <button class="mode-tab" type="button" data-mode="Bond">Bond</button>
+              <button class="mode-tab" type="button" data-mode="Angle">Angle</button>
+              <button class="mode-tab" type="button" data-mode="Dihedral">Dihedral</button>
+              <button class="mode-tab" type="button" data-mode="1-4 Nonbonded">1-4 Nonbonded</button>
+              <button class="mode-tab" type="button" data-mode="Non-bonded">Non-bonded</button>
+            </div>
+          </div>
+        </div>
+        <div id="selection-body">
+          <div id="atom-details">No atom selected.</div>
+          <div id="about-panel" class="hidden">
+            <h3>About charge and LJ</h3>
+            <div id="about-content">Select an atom to see the calculation details.</div>
           </div>
         </div>
       </div>
-      <div id="info-body">
-        <div id="atom-details">No atom selected.</div>
-        <div id="about-panel" class="hidden">
-          <h3>About charge and LJ</h3>
-          <div id="about-content">Select an atom to see the calculation details.</div>
+      <div id="viewer-pane">
+        <div class="pane-header">
+          <h3>Viewer</h3>
         </div>
-        <div id="parm7-panel">
-          <h3>Parm7</h3>
-          <div id="parm7-sections"></div>
-          <div id="parm7-view">No parm7 loaded.</div>
+        <div id="viewer"></div>
+      </div>
+    </div>
+    <div id="info-panel">
+      <div id="system-info-panel">
+        <div class="pane-header system-info-header">
+          <h3>info</h3>
+          <button id="system-info-export" type="button">Export CSV</button>
         </div>
+        <div id="system-info-tabs"></div>
+        <div id="system-info-content">No system info loaded.</div>
+      </div>
+      <div id="parm7-panel">
+        <div class="pane-header">
+          <h3>parm7</h3>
+        </div>
+        <div id="parm7-sections"></div>
+        <div id="parm7-view">No parm7 loaded.</div>
       </div>
     </div>
   </div>
-  <script src="app.js"></script>
+  <script type="module" src="src/app.js"></script>
 </body>
 </html>
