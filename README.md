@@ -1,4 +1,4 @@
-# Parm7 Viewer
+# Topview
 
 Offline desktop viewer for AMBER parm7 + rst7 files using pywebview, 3Dmol.js, and MDAnalysis.
 
@@ -16,19 +16,25 @@ The app defaults to local assets and does not load from CDN.
 ## Run
 
 ```bash
-python app.py
+python -m topview.app
 ```
 
 Or pass files directly:
 
 ```bash
-python app.py /path/to/file.parm7 /path/to/file.rst7
+python -m topview.app /path/to/file.parm7 /path/to/file.rst7
+```
+
+You can also run the package entrypoint:
+
+```bash
+python -m topview /path/to/file.parm7 /path/to/file.rst7
 ```
 
 Enable debug logging to a file:
 
 ```bash
-python app.py --log-file /path/to/parmviewer.log
+python -m topview.app --log-file /path/to/topview.log
 ```
 
 ## Notes
