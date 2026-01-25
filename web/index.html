@@ -8,10 +8,10 @@
 </head>
 <body>
   <div id="toolbar">
-    <button id="open-btn" type="button">Open parm7 + rst7</button>
+    <button id="open-btn" type="button">Open parm7 (rst7 optional)</button>
     <div class="path-inputs">
       <input id="parm7-path" type="text" placeholder="parm7 path" />
-      <input id="rst7-path" type="text" placeholder="rst7 path" />
+      <input id="rst7-path" type="text" placeholder="rst7 path (optional)" />
       <button id="load-btn" type="button">Load</button>
     </div>
     <label class="toolbar-group">
@@ -71,7 +71,13 @@
         <div class="pane-header">
           <h3>Viewer</h3>
         </div>
-        <div id="viewer"></div>
+        <div id="viewer">
+          <div id="viewer-3d"></div>
+          <div id="viewer-2d">
+            <div id="viewer-2d-svg"></div>
+            <div id="viewer-2d-overlay"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="info-panel">

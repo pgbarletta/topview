@@ -519,6 +519,7 @@ def _build_dihedral_table(
     scnb_scale: np.ndarray,
 ) -> pd.DataFrame:
     entries: List[Tuple[int, int, int, int, int, int]] = []
+    term_idx = 1
     for name, count in (
         ("DIHEDRALS_INC_HYDROGEN", nphih),
         ("DIHEDRALS_WITHOUT_HYDROGEN", mphia),
@@ -529,18 +530,13 @@ def _build_dihedral_table(
         records = values.reshape(-1, 5)
         atom_serials = _pointer_to_serial(records[:, :4])
         param_index = np.abs(records[:, 4]).astype(int)
-        idx_by_ijkl: Dict[Tuple[int, int, int, int], int] = {}
-        next_idx = 1
         for idx in range(atom_serials.shape[0]):
             atom_i = int(atom_serials[idx, 0])
             atom_j = int(atom_serials[idx, 1])
             atom_k = int(atom_serials[idx, 2])
             atom_l = int(atom_serials[idx, 3])
-            key = (atom_i, atom_j, atom_k, atom_l)
-            if key not in idx_by_ijkl:
-                idx_by_ijkl[key] = next_idx
-                next_idx += 1
-            entries.append((atom_i, atom_j, atom_k, atom_l, int(param_index[idx]), idx_by_ijkl[key]))
+            entries.append((atom_i, atom_j, atom_k, atom_l, int(param_index[idx]), term_idx))
+            term_idx += 1
     if not entries:
         return _empty_table(
             [

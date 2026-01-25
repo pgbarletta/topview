@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from typing import Optional, Tuple
 
@@ -23,6 +24,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("parm7_path", nargs="?", help="Path to parm7/prmtop file")
     parser.add_argument("rst7_path", nargs="?", help="Path to rst7/inpcrd file")
     parser.add_argument(
+        "--resname",
+        dest="resname",
+        default=config.DEFAULT_RESNAME,
+        help="Residue name to depict when only parm7 is provided",
+    )
+    parser.add_argument(
         "--log-file",
         dest="log_file",
         default=None,
@@ -35,25 +42,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=config.DEFAULT_INFO_FONT_SIZE,
         help="Font size (pt) for section info popups",
     )
-    args = parser.parse_args(argv[1:])
-    if (args.parm7_path and not args.rst7_path) or (args.rst7_path and not args.parm7_path):
-        parser.print_usage(sys.stderr)
-        args.parm7_path = None
-        args.rst7_path = None
-    return args
+    return parser.parse_args(argv[1:])
 
 
 def create_app(
-    initial_paths: Optional[Tuple[str, str]] = None, info_font_size: float = config.DEFAULT_INFO_FONT_SIZE
+    initial_paths: Optional[Tuple[str, Optional[str]]] = None,
+    info_font_size: float = config.DEFAULT_INFO_FONT_SIZE,
+    initial_resname: str = config.DEFAULT_RESNAME,
 ):
     """Create the pywebview window and API bridge.
 
     Parameters
     ----------
     initial_paths
-        Optional tuple of parm7 and rst7 paths.
+        Optional tuple of parm7 and rst7 paths (rst7 can be None).
     info_font_size
         Font size for section info popups.
+    initial_resname
+        Residue name to depict when only parm7 is provided.
 
     Returns
     -------
@@ -67,6 +73,7 @@ def create_app(
         model=model,
         worker=worker,
         initial_paths=initial_paths,
+        initial_resname=initial_resname,
         ui_config={"info_font_size": info_font_size},
     )
 
@@ -96,13 +103,18 @@ def main() -> None:
     configure_logging(args.log_file)
     logger.debug("Starting application")
     initial_paths = None
-    if args.parm7_path and args.rst7_path:
+    if args.parm7_path:
         initial_paths = (args.parm7_path, args.rst7_path)
         logger.debug("Launching with initial files")
     else:
         logger.debug("Launching without initial files")
-    create_app(initial_paths=initial_paths, info_font_size=args.info_font_size)
-    webview.start(debug=False)
+    create_app(
+        initial_paths=initial_paths,
+        info_font_size=args.info_font_size,
+        initial_resname=args.resname,
+    )
+    gui = os.environ.get("PYWEBVIEW_GUI", "qt")
+    webview.start(debug=False, gui=gui)
 
 
 if __name__ == "__main__":

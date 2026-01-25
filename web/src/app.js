@@ -24,6 +24,7 @@ import {
   applyStylePreset,
   highlightSerials,
   renderModel,
+  render2dModel,
   resizeViewer,
 } from "./viewer.js";
 import {
@@ -38,24 +39,21 @@ import { decodeBase64 } from "./utils.js";
 
 window.__pywebview_ready = false;
 window.__pendingLoad = null;
+let pywebviewWarningTimer = null;
 
 function loadFromInputs() {
   const parm7 = document.getElementById("parm7-path").value.trim();
   const rst7 = document.getElementById("rst7-path").value.trim();
-  if (!parm7 || !rst7) {
-    reportError("Provide both parm7 and rst7 paths");
+  if (!parm7) {
+    reportError("Provide a parm7 path");
     return;
   }
-  loadSystem(parm7, rst7);
+  loadSystem(parm7, rst7 || null);
 }
 
-async function loadSystem(parm7Path, rst7Path) {
+async function loadSystem(parm7Path, rst7Path, resname) {
   if (!hasApiMethod("load_system")) {
     reportError("pywebview API not available");
-    return;
-  }
-  const readyViewer = await ensureViewer();
-  if (!readyViewer) {
     return;
   }
   clearSelection();
@@ -75,7 +73,7 @@ async function loadSystem(parm7Path, rst7Path) {
   setStatus("loading", "Loading system...");
 
   try {
-    const result = await apiLoadSystem(parm7Path, rst7Path);
+    const result = await apiLoadSystem(parm7Path, rst7Path, resname);
     if (!result || !result.ok) {
       const msg = result && result.error ? result.error.message : "Failed to load";
       reportError(msg);
@@ -85,21 +83,45 @@ async function loadSystem(parm7Path, rst7Path) {
     console.debug(
       `load_system completed in ${(performance.now() - loadStart).toFixed(1)}ms`
     );
-    renderModel(result.pdb_b64, selectAtom);
-    const styleSelect = document.getElementById("style-select");
-    if (styleSelect) {
-      applyStylePreset(styleSelect.value, false);
+    if (result.view_mode === "2d") {
+      const rendered = render2dModel(result.depiction, selectAtom, clearSelection);
+      if (!rendered) {
+        setLoading(false);
+        return;
+      }
+      const info = result.depiction || {};
+      const label = info.resname ? `${info.resname}${info.resid ? " " + info.resid : ""}` : "2D";
+      const warn =
+        result.warnings && result.warnings.length
+          ? ` Warnings: ${result.warnings.join(", ")}`
+          : "";
+      setStatus(
+        "success",
+        `Loaded ${label} (${result.natoms} atoms, ${result.nresidues} residues).${warn}`
+      );
+      setLoading(false);
+    } else {
+      const readyViewer = await ensureViewer();
+      if (!readyViewer) {
+        setLoading(false);
+        return;
+      }
+      renderModel(result.pdb_b64, selectAtom, clearSelection);
+      const styleSelect = document.getElementById("style-select");
+      if (styleSelect) {
+        applyStylePreset(styleSelect.value, false);
+      }
+      resizeViewer(true);
+      const warn =
+        result.warnings && result.warnings.length
+          ? ` Warnings: ${result.warnings.join(", ")}`
+          : "";
+      setStatus(
+        "success",
+        `Loaded ${result.natoms} atoms, ${result.nresidues} residues.${warn}`
+      );
+      setLoading(false);
     }
-    resizeViewer(true);
-    const warn =
-      result.warnings && result.warnings.length
-        ? ` Warnings: ${result.warnings.join(", ")}`
-        : "";
-    setStatus(
-      "success",
-      `Loaded ${result.natoms} atoms, ${result.nresidues} residues.${warn}`
-    );
-    setLoading(false);
   } catch (err) {
     reportError(String(err));
     setLoading(false);
@@ -156,7 +178,8 @@ function setInitialPaths(payload) {
   }
   const parm7Path = payload.parm7 || payload.parm7_path || "";
   const rst7Path = payload.rst7 || payload.rst7_path || "";
-  if (!parm7Path || !rst7Path) {
+  const resname = payload.resname || "";
+  if (!parm7Path) {
     return;
   }
   const parm7Input = document.getElementById("parm7-path");
@@ -168,10 +191,10 @@ function setInitialPaths(payload) {
     rst7Input.value = rst7Path;
   }
   if (hasApiMethod("load_system")) {
-    loadSystem(parm7Path, rst7Path);
+    loadSystem(parm7Path, rst7Path || null, resname || null);
     return;
   }
-  state.pendingLoad = { parm7: parm7Path, rst7: rst7Path };
+  state.pendingLoad = { parm7: parm7Path, rst7: rst7Path, resname: resname };
   window.__pendingLoad = state.pendingLoad;
 }
 
@@ -229,8 +252,8 @@ function handleOpenDialog() {
         return;
       }
       document.getElementById("parm7-path").value = result.parm7_path;
-      document.getElementById("rst7-path").value = result.rst7_path;
-      loadSystem(result.parm7_path, result.rst7_path);
+      document.getElementById("rst7-path").value = result.rst7_path || "";
+      loadSystem(result.parm7_path, result.rst7_path || null);
     })
     .catch((err) => {
       reportError(String(err));
@@ -280,6 +303,10 @@ function attachEvents() {
 window.addEventListener("pywebviewready", async function () {
   state.pywebviewReady = true;
   window.__pywebview_ready = true;
+  if (pywebviewWarningTimer) {
+    window.clearTimeout(pywebviewWarningTimer);
+    pywebviewWarningTimer = null;
+  }
   attachEvents();
   await ensureViewer();
   setStatus("success", "Ready", "");
@@ -296,8 +323,12 @@ window.addEventListener("pywebviewready", async function () {
   if (hasApiMethod("get_initial_paths")) {
     getInitialPaths()
       .then((result) => {
-        if (result && result.ok && result.parm7_path && result.rst7_path) {
-          setInitialPaths({ parm7: result.parm7_path, rst7: result.rst7_path });
+        if (result && result.ok && result.parm7_path) {
+          setInitialPaths({
+            parm7: result.parm7_path,
+            rst7: result.rst7_path,
+            resname: result.resname,
+          });
         }
       })
       .catch(() => {});
@@ -306,7 +337,7 @@ window.addEventListener("pywebviewready", async function () {
     const payload = state.pendingLoad;
     state.pendingLoad = null;
     window.__pendingLoad = null;
-    loadSystem(payload.parm7, payload.rst7);
+    loadSystem(payload.parm7, payload.rst7 || null, payload.resname || null);
   }
 });
 
@@ -316,7 +347,14 @@ window.addEventListener("DOMContentLoaded", function () {
   attachSystemInfoExport();
   if (!window.pywebview) {
     ensureViewer();
-    reportError("pywebview not available. Run via Python app.");
+    if (!pywebviewWarningTimer) {
+      pywebviewWarningTimer = window.setTimeout(() => {
+        if (!state.pywebviewReady && !window.pywebview) {
+          reportError("pywebview not available. Run via Python app.");
+        }
+        pywebviewWarningTimer = null;
+      }, 1500);
+    }
   }
   const fontInput = document.getElementById("parm7-font-size");
   if (fontInput) {

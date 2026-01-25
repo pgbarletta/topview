@@ -13,12 +13,14 @@ authors = [
   {name = "Topview Contributors"}
 ]
 dependencies = [
+  "numpy<2",
   "MDAnalysis>=2.0",
   "parmed>=4.2",
   "pandas>=2.0",
   "pywebview[qt]>=6.1",
   "PyQt6>=6.5",
   "qtpy>=2.4",
+  "rdkit>=2025",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,9 @@ dev = [
   "build>=1.2",
   "pytest>=7.0",
 ]
+
+[project.scripts]
+topview = "topview.cli.topview:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

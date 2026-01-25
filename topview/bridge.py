@@ -27,6 +27,8 @@ class Api:
         Pywebview window instance for dialogs.
     _initial_paths
         Initial file paths passed via CLI.
+    _initial_resname
+        Optional residue name for parm7-only depictions.
     _ui_config
         UI configuration payload for the frontend.
     """
@@ -35,7 +37,8 @@ class Api:
         self,
         model: Model,
         worker: Worker,
-        initial_paths: Optional[tuple[str, str]] = None,
+        initial_paths: Optional[tuple[str, Optional[str]]] = None,
+        initial_resname: Optional[str] = None,
         ui_config: Optional[Dict[str, object]] = None,
     ) -> None:
         """Initialize the bridge API.
@@ -48,6 +51,10 @@ class Api:
             Worker instance for background tasks.
         initial_paths
             Optional tuple of initial parm7/rst7 paths.
+        initial_resname
+            Optional residue name to depict for parm7-only loads.
+        initial_resname
+            Optional residue name to depict for parm7-only loads.
         ui_config
             Optional UI configuration payload.
 
@@ -61,6 +68,7 @@ class Api:
         self._worker = worker
         self._window = None
         self._initial_paths = initial_paths
+        self._initial_resname = initial_resname
         self._ui_config = ui_config or {}
 
     def set_window(self, window) -> None:
@@ -94,11 +102,22 @@ class Api:
         """
 
         if not self._initial_paths:
-            return {"ok": True, "parm7_path": None, "rst7_path": None}
+            return {
+                "ok": True,
+                "parm7_path": None,
+                "rst7_path": None,
+                "resname": self._initial_resname,
+            }
         parm7_path, rst7_path = self._initial_paths
         self._initial_paths = None
+        self._initial_resname = None
         logger.debug("get_initial_paths returned paths")
-        return {"ok": True, "parm7_path": parm7_path, "rst7_path": rst7_path}
+        return {
+            "ok": True,
+            "parm7_path": parm7_path,
+            "rst7_path": rst7_path,
+            "resname": self._initial_resname,
+        }
 
     def get_ui_config(self, payload: Optional[Dict[str, object]] = None):
         """Return UI configuration for the frontend.
@@ -117,12 +136,12 @@ class Api:
         return {"ok": True, "config": self._ui_config}
 
     def load_system(self, payload: Dict[str, object]):
-        """Load a parm7/rst7 pair.
+        """Load a parm7/rst7 pair or parm7-only system.
 
         Parameters
         ----------
         payload
-            Payload containing parm7_path and rst7_path.
+            Payload containing parm7_path, optional rst7_path, and optional resname.
 
         Returns
         -------
@@ -132,11 +151,17 @@ class Api:
 
         if not isinstance(payload, dict):
             return error_result("invalid_input", "payload must be an object")
-        parm7_path = payload.get("parm7_path")
-        rst7_path = payload.get("rst7_path")
+        parm7_path = payload.get("parm7_path") or None
+        rst7_path = payload.get("rst7_path") or None
+        resname = payload.get("resname")
         try:
             logger.debug("load_system requested parm7=%s rst7=%s", parm7_path, rst7_path)
-            future = self._worker.submit(self._model.load_system, parm7_path, rst7_path)
+            future = self._worker.submit(
+                self._model.load_system,
+                parm7_path,
+                rst7_path,
+                resname,
+            )
             return future.result()
         except ModelError as exc:
             logger.exception("load_system failed")
@@ -442,8 +467,12 @@ class Api:
                 file_types=("Rst7 (*.rst7 *.rst *.inpcrd)", "All files (*.*)"),
             )
             if not rst7:
-                logger.debug("select_files cancelled at rst7")
-                return error_result("cancelled", "No rst7 file selected")
+                logger.debug("select_files returned without rst7")
+                return {
+                    "ok": True,
+                    "parm7_path": parm7[0],
+                    "rst7_path": None,
+                }
             return {
                 "ok": True,
                 "parm7_path": parm7[0],

@@ -2,6 +2,7 @@ import { DEFAULT_SELECTION_MODE, DEFAULT_STYLE_KEY } from "./constants.js";
 
 export const state = {
   viewer: null,
+  viewMode: "3d",
   model: null,
   baseStyle: null,
   currentSelection: [],
@@ -41,6 +42,17 @@ export const state = {
   atomIndexBySerial: new Map(),
   atomByIndex: new Map(),
   modelAtoms: [],
+  rdkitSvgNode: null,
+  rdkitOverlayNode: null,
+  rdkitAtomSerials: [],
+  rdkitAtomIndexBySerial: new Map(),
+  rdkitAtomCoords: [],
+  rdkitAtomNames: [],
+  rdkitBondPairs: [],
+  rdkitBondIndexByPair: new Map(),
+  rdkitClickHandler: null,
+  viewerLabelNodes: [],
   emptyClickArmed: false,
+  emptyClickArmed2d: false,
   lastAtomClick: false,
 };

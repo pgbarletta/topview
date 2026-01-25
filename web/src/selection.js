@@ -59,56 +59,66 @@ export function cacheAtom(serial, payload) {
  */
 export function updateSelectionState(serial) {
   if (!serial) {
-    return;
+    return false;
   }
+  const prevSelection = state.selectionSerials.slice();
+  const prevMode = state.selectionMode;
+  const prevInteraction = state.currentInteraction;
   state.currentInteraction = null;
   if (!state.selectionSerials.length || state.selectionSerials.includes(serial)) {
     state.selectionSerials = [serial];
     setSelectionMode(DEFAULT_SELECTION_MODE);
-    return;
+    return true;
   }
 
-  state.selectionSerials = state.selectionSerials.concat(serial);
-  if (state.selectionSerials.length > 4) {
-    state.selectionSerials = state.selectionSerials.slice(-4);
+  let nextSelection = state.selectionSerials.concat(serial);
+  if (nextSelection.length > 4) {
+    nextSelection = nextSelection.slice(-4);
   }
 
-  if (state.selectionSerials.length === 4) {
-    const path = findBondPath(state.selectionSerials);
+  if (nextSelection.length === 4) {
+    const path = findBondPath(nextSelection);
     if (path) {
       state.selectionSerials = path;
       setSelectionMode("Dihedral");
-      return;
+      return true;
     }
   }
 
-  if (state.selectionSerials.length === 3) {
-    const path = findBondPath(state.selectionSerials);
+  if (nextSelection.length === 3) {
+    const path = findBondPath(nextSelection);
     if (path) {
       state.selectionSerials = path;
       setSelectionMode("Angle");
-      return;
+      return true;
     }
   }
 
-  if (state.selectionSerials.length >= 2) {
-    const lastTwo = state.selectionSerials.slice(-2);
+  if (nextSelection.length >= 2) {
+    const lastTwo = nextSelection.slice(-2);
     state.selectionSerials = lastTwo;
     if (areBonded(lastTwo[0], lastTwo[1])) {
       setSelectionMode("Bond");
     } else {
       const distance = bondDistance(lastTwo[0], lastTwo[1], 3);
+      if (distance === 2) {
+        state.selectionSerials = prevSelection;
+        setSelectionMode(prevMode);
+        state.currentInteraction = prevInteraction;
+        return false;
+      }
       if (distance === 3) {
         setSelectionMode("1-4 Nonbonded");
       } else {
         setSelectionMode("Non-bonded");
       }
     }
-    return;
+    return true;
   }
 
   state.selectionSerials = [serial];
   setSelectionMode(DEFAULT_SELECTION_MODE);
+  return true;
 }
 
 /**
@@ -178,7 +188,10 @@ export function selectAtom(serial) {
     return;
   }
   state.lastAtomClick = true;
-  updateSelectionState(serial);
+  const selectionUpdated = updateSelectionState(serial);
+  if (!selectionUpdated) {
+    return;
+  }
   renderSelectionSummaryAndResize();
   const selection = state.selectionSerials.length ? state.selectionSerials : [serial];
   highlightSerials(selection);

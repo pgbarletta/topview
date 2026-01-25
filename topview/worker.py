@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import multiprocessing as mp
+import signal
 from typing import Any, Callable, Optional
+
+
+def _ignore_sigint() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 class Worker:
@@ -31,7 +36,9 @@ class Worker:
         if max_processes and max_processes > 0:
             context = mp.get_context("spawn")
             self._process_executor = ProcessPoolExecutor(
-                max_workers=max_processes, mp_context=context
+                max_workers=max_processes,
+                mp_context=context,
+                initializer=_ignore_sigint,
             )
 
     def submit(self, fn: Callable[..., Any], *args: Any, **kwargs: Any):

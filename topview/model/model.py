@@ -179,15 +179,19 @@ class Model:
         highlights, _ = engine.get_highlights([meta.serial], mode="Atom")
         return {"ok": True, "atom": meta.to_dict(), "highlights": highlights}
 
-    def load_system(self, parm7_path: str, rst7_path: str) -> Dict[str, object]:
-        """Load a parm7/rst7 system and populate model state.
+    def load_system(
+        self, parm7_path: str, rst7_path: Optional[str], resname: Optional[str] = None
+    ) -> Dict[str, object]:
+        """Load a parm7 system and populate model state.
 
         Parameters
         ----------
         parm7_path
             Path to the parm7 file.
         rst7_path
-            Path to the rst7 file.
+            Optional path to the rst7 file.
+        resname
+            Residue name to depict when only parm7 is provided.
 
         Returns
         -------
@@ -202,7 +206,10 @@ class Model:
 
         load_started_at = time.perf_counter()
         result = load_system_data(
-            parm7_path, rst7_path, cpu_submit=self._cpu_submit
+            parm7_path,
+            rst7_path,
+            resname=resname,
+            cpu_submit=self._cpu_submit,
         )
         info_future = None
         if self._cpu_submit:
@@ -226,13 +233,18 @@ class Model:
             self._state.load_timings = result.timings
             self._state.load_started_at = load_started_at
             self._state.loaded = True
-        return {
+        payload = {
             "ok": True,
-            "pdb_b64": result.pdb_b64,
+            "view_mode": result.view_mode,
             "natoms": result.natoms,
             "nresidues": result.nresidues,
             "warnings": result.warnings,
         }
+        if result.view_mode == "3d":
+            payload["pdb_b64"] = result.pdb_b64
+        else:
+            payload["depiction"] = result.depiction
+        return payload
 
     def get_atom_info(self, serial: int) -> Dict[str, object]:
         """Return atom metadata for a single serial.
