@@ -148,14 +148,10 @@ def _compute_lj_tables(
             else []
         )
         acoef_values = (
-            [token.value for token in acoef_section.tokens]
-            if acoef_section
-            else []
+            [token.value for token in acoef_section.tokens] if acoef_section else []
         )
         bcoef_values = (
-            [token.value for token in bcoef_section.tokens]
-            if bcoef_section
-            else []
+            [token.value for token in bcoef_section.tokens] if bcoef_section else []
         )
         if not nonbond_values or not acoef_values or not bcoef_values:
             raise ModelError(
@@ -215,8 +211,12 @@ def _build_rdkit_depiction(
         atomic_number = getattr(atom, "atomic_number", None)
         if not atomic_number:
             element = getattr(atom, "element", None)
-            element_symbol = str(element).strip() if element else _guess_element(name) or ""
-            atomic_number = periodic.GetAtomicNumber(element_symbol) if element_symbol else 0
+            element_symbol = (
+                str(element).strip() if element else _guess_element(name) or ""
+            )
+            atomic_number = (
+                periodic.GetAtomicNumber(element_symbol) if element_symbol else 0
+            )
         rd_atom = Chem.Atom(int(atomic_number)) if atomic_number else Chem.Atom(0)
         rd_idx = rw_mol.AddAtom(rd_atom)
         atom_idx_by_serial[serial] = rd_idx
@@ -269,7 +269,9 @@ def _build_rdkit_depiction(
     try:
         rdDepictor.Compute2DCoords(mol)
     except Exception as exc:
-        raise ModelError("rdkit_failed", "Failed to compute 2D coordinates", str(exc)) from exc
+        raise ModelError(
+            "rdkit_failed", "Failed to compute 2D coordinates", str(exc)
+        ) from exc
 
     drawer = rdMolDraw2D.MolDraw2DSVG(width, height)
     drawer.DrawMolecule(mol)
@@ -364,7 +366,12 @@ def load_system_data_3d(
     parm7_time = 0.0
     with ThreadPoolExecutor(max_workers=2) as executor:
         universe_future = executor.submit(
-            _timed_call, mda.Universe, parm7_path, rst7_path, format="RESTRT"
+            _timed_call,
+            mda.Universe,
+            parm7_path,
+            rst7_path,
+            format="RESTRT",
+            topology_format="PARM7",
         )
         parm7_future = executor.submit(_timed_call, parse_parm7, parm7_path)
         try:
@@ -391,7 +398,9 @@ def load_system_data_3d(
     try:
         pointers = parse_pointers(pointer_section)
     except ValueError as exc:
-        raise ModelError("parm7_parse_failed", "Failed to parse POINTERS", str(exc)) from exc
+        raise ModelError(
+            "parm7_parse_failed", "Failed to parse POINTERS", str(exc)
+        ) from exc
 
     natom = int(pointers.get("NATOM", 0))
     ntypes = int(pointers.get("NTYPES", 0))
@@ -431,12 +440,8 @@ def load_system_data_3d(
     attrs_start = time.perf_counter()
     names = _safe_attr(atoms, "names") or [atom.name for atom in atoms]
     resids = _safe_attr(atoms, "resids") or [atom.residue.resid for atom in atoms]
-    resnames = _safe_attr(atoms, "resnames") or [
-        atom.residue.resname for atom in atoms
-    ]
-    resindices = _safe_attr(atoms, "resindices") or [
-        atom.residue.ix for atom in atoms
-    ]
+    resnames = _safe_attr(atoms, "resnames") or [atom.residue.resname for atom in atoms]
+    resindices = _safe_attr(atoms, "resindices") or [atom.residue.ix for atom in atoms]
     segids = _safe_attr(atoms, "segids")
     chains = _safe_attr(atoms, "chainIDs")
     elements = _safe_attr(atoms, "elements")
@@ -616,7 +621,9 @@ def load_system_data_2d(
         parm7_text, parm7_sections = parse_parm7(parm7_path)
     except Exception as exc:
         logger.exception("Failed to parse parm7 file")
-        raise ModelError("parm7_parse_failed", "Failed to parse parm7 file", str(exc)) from exc
+        raise ModelError(
+            "parm7_parse_failed", "Failed to parse parm7 file", str(exc)
+        ) from exc
     parm7_time = time.perf_counter() - parse_start
     parm7_text_b64 = base64.b64encode(parm7_text.encode("utf-8")).decode("ascii")
 
@@ -626,7 +633,9 @@ def load_system_data_2d(
     try:
         pointers = parse_pointers(pointer_section)
     except ValueError as exc:
-        raise ModelError("parm7_parse_failed", "Failed to parse POINTERS", str(exc)) from exc
+        raise ModelError(
+            "parm7_parse_failed", "Failed to parse POINTERS", str(exc)
+        ) from exc
 
     natom = int(pointers.get("NATOM", 0))
     ntypes = int(pointers.get("NTYPES", 0))
@@ -672,7 +681,9 @@ def load_system_data_2d(
     atoms = list(parm.atoms)
     residues = list(parm.residues)
     if len(atoms) != natom:
-        logger.debug("Atom count mismatch: POINTERS NATOM=%d parmed=%d", natom, len(atoms))
+        logger.debug(
+            "Atom count mismatch: POINTERS NATOM=%d parmed=%d", natom, len(atoms)
+        )
 
     warnings: List[str] = []
     charge_section = parm7_sections.get("CHARGE")
@@ -840,7 +851,9 @@ def load_system_data_2d(
 
     meta_build_time = time.perf_counter() - build_start
     total_time = time.perf_counter() - total_start
-    logger.debug("System loaded (2D): atoms=%d residues=%d", len(meta_list), len(residues))
+    logger.debug(
+        "System loaded (2D): atoms=%d residues=%d", len(meta_list), len(residues)
+    )
 
     timings = {
         "parm7": parm7_time,
