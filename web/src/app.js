@@ -13,6 +13,7 @@ import { selectAtom, clearSelection } from "./selection.js";
 import { state } from "./state.js";
 import {
   attachSystemInfoExport,
+  attachSystemInfoRowActions,
   attachSystemInfoTabs,
   loadSystemInfo,
   resetSystemInfoState,
@@ -345,6 +346,7 @@ window.addEventListener("DOMContentLoaded", function () {
   attachEvents();
   attachSystemInfoTabs();
   attachSystemInfoExport();
+  attachSystemInfoRowActions();
   if (!window.pywebview) {
     ensureViewer();
     if (!pywebviewWarningTimer) {
