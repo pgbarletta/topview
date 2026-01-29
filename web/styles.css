@@ -356,6 +356,11 @@ body.dark-mode {
   --mode-bg: var(--mode-dihedral-bg);
 }
 
+.mode-tab[data-mode="Improper"] {
+  --mode-color: var(--mode-dihedral);
+  --mode-bg: var(--mode-dihedral-bg);
+}
+
 .mode-tab[data-mode="1-4 Nonbonded"] {
   --mode-color: var(--mode-14);
   --mode-bg: var(--mode-14-bg);
@@ -467,6 +472,42 @@ body.dark-mode {
   background: var(--panel-muted-bg);
   position: sticky;
   top: 0;
+}
+
+.system-info-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.system-info-sort:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.system-info-sort .sort-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 8px;
+  font-size: 9px;
+}
+
+.system-info-sort .sort-arrow {
+  opacity: 0.4;
+}
+
+.system-info-sort .sort-arrow.active {
+  opacity: 1;
+  color: var(--accent);
 }
 
 .system-info-select-cell {
@@ -623,6 +664,11 @@ body.dark-mode {
 }
 
 #parm7-sections button[data-mode="Dihedral"] {
+  border-color: var(--mode-dihedral);
+  background: var(--mode-dihedral-bg);
+}
+
+#parm7-sections button[data-mode="Improper"] {
   border-color: var(--mode-dihedral);
   background: var(--mode-dihedral-bg);
 }

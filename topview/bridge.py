@@ -109,6 +109,7 @@ class Api:
                 "resname": self._initial_resname,
             }
         parm7_path, rst7_path = self._initial_paths
+        initial_resname = self._initial_resname
         self._initial_paths = None
         self._initial_resname = None
         logger.debug("get_initial_paths returned paths")
@@ -116,7 +117,7 @@ class Api:
             "ok": True,
             "parm7_path": parm7_path,
             "rst7_path": rst7_path,
-            "resname": self._initial_resname,
+            "resname": initial_resname,
         }
 
     def get_ui_config(self, payload: Optional[Dict[str, object]] = None):

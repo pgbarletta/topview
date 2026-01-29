@@ -192,6 +192,7 @@ class ModelState:
     system_info_future: Optional[Future] = None
     system_info_selection_index: Optional[object] = None
     system_info_selection_future: Optional[Future] = None
+    bond_adjacency: Optional[Dict[int, set[int]]] = None
     load_timings: Optional[Dict[str, float]] = None
     load_started_at: Optional[float] = None
     loaded: bool = False

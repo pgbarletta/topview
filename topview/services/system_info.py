@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -106,6 +106,7 @@ def build_system_info_tables(
         bond_force,
         bond_equil,
     )
+    bond_adjacency = _build_bond_adjacency(sections, nbondh, mbona)
     angle_df = _build_angle_table(
         sections,
         atom_type_indices,
@@ -126,6 +127,19 @@ def build_system_info_tables(
         dihedral_phase,
         scee_scale,
         scnb_scale,
+    )
+    improper_df = _build_improper_table(
+        sections,
+        atom_names,
+        amber_atom_types,
+        nphih,
+        mphia,
+        dihedral_force,
+        dihedral_periodicity,
+        dihedral_phase,
+        scee_scale,
+        scnb_scale,
+        bond_adjacency,
     )
     one_four_df = _build_one_four_table(
         sections,
@@ -157,6 +171,7 @@ def build_system_info_tables(
         "bond_types": _df_to_table(bond_df),
         "angle_types": _df_to_table(angle_df),
         "dihedral_types": _df_to_table(dihedral_df),
+        "improper_types": _df_to_table(improper_df),
         "one_four_nonbonded": _df_to_table(one_four_df),
         "nonbonded_pairs": _df_to_table(nonbonded_df),
     }
@@ -416,6 +431,27 @@ def _build_bond_table(
     ].sort_values(["type_a", "type_b", "param_index"])
 
 
+def _build_bond_adjacency(
+    sections: Dict[str, Parm7Section], nbondh: int, mbona: int
+) -> Dict[int, set[int]]:
+    adjacency: Dict[int, set[int]] = {}
+    for name, count in (
+        ("BONDS_INC_HYDROGEN", nbondh),
+        ("BONDS_WITHOUT_HYDROGEN", mbona),
+    ):
+        values = _parse_int_section(sections, name, count * 3)
+        if values.size == 0:
+            continue
+        records = values.reshape(-1, 3)
+        atom_serials = _pointer_to_serial(records[:, :2])
+        for row in atom_serials:
+            atom_a = int(row[0])
+            atom_b = int(row[1])
+            adjacency.setdefault(atom_a, set()).add(atom_b)
+            adjacency.setdefault(atom_b, set()).add(atom_a)
+    return adjacency
+
+
 def _build_angle_table(
     sections: Dict[str, Parm7Section],
     atom_type_indices: np.ndarray,
@@ -572,6 +608,149 @@ def _build_dihedral_table(
             id_by_ijkl[key] = next_id
             next_id += 1
         name_i, name_j, name_k, name_l = _lookup_ijkl_labels(atom_names, atom_i, atom_j, atom_k, atom_l)
+        type_i, type_j, type_k, type_l = _lookup_ijkl_labels(
+            amber_atom_types, atom_i, atom_j, atom_k, atom_l
+        )
+        rows.append(
+            {
+                "ID": id_by_ijkl[key],
+                "idx": int(idx_values[idx]),
+                "ijkl indices": f"{atom_i}, {atom_j}, {atom_k}, {atom_l}",
+                "ijkl names": f"{name_i}, {name_j}, {name_k}, {name_l}",
+                "ijkl types": f"{type_i}, {type_j}, {type_k}, {type_l}",
+                "force_constant": force[idx],
+                "periodicity": periodicity[idx],
+                "phase": phase[idx],
+                "scee": scee[idx],
+                "scnb": scnb[idx],
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "ID",
+            "idx",
+            "ijkl indices",
+            "ijkl names",
+            "ijkl types",
+            "force_constant",
+            "periodicity",
+            "phase",
+            "scee",
+            "scnb",
+        ],
+    )
+
+
+def _find_improper_central(
+    serials: Sequence[int], adjacency: Dict[int, set[int]]
+) -> Optional[int]:
+    candidates: List[int] = []
+    for candidate in serials:
+        neighbors = adjacency.get(int(candidate), set())
+        if all(int(other) in neighbors for other in serials if other != candidate):
+            candidates.append(int(candidate))
+    return min(candidates) if candidates else None
+
+
+def _order_improper(central: int, serials: Sequence[int]) -> Tuple[int, int, int, int]:
+    others: List[int] = []
+    for value in serials:
+        if int(value) == int(central):
+            continue
+        others.append(int(value))
+    others.sort()
+    ordered = [int(central)] + others
+    while len(ordered) < 4:
+        ordered.append(int(central))
+    return (ordered[0], ordered[1], ordered[2], ordered[3])
+
+
+def _build_improper_table(
+    sections: Dict[str, Parm7Section],
+    atom_names: List[str],
+    amber_atom_types: List[str],
+    nphih: int,
+    mphia: int,
+    dihedral_force: np.ndarray,
+    dihedral_periodicity: np.ndarray,
+    dihedral_phase: np.ndarray,
+    scee_scale: np.ndarray,
+    scnb_scale: np.ndarray,
+    adjacency: Dict[int, set[int]],
+) -> pd.DataFrame:
+    entries: List[Tuple[int, int, int, int, int, int]] = []
+    term_idx = 1
+    for name, count in (
+        ("DIHEDRALS_INC_HYDROGEN", nphih),
+        ("DIHEDRALS_WITHOUT_HYDROGEN", mphia),
+    ):
+        values = _parse_int_section(sections, name, count * 5)
+        if values.size == 0:
+            continue
+        records = values.reshape(-1, 5)
+        atom_serials = _pointer_to_serial(records[:, :4])
+        param_index = np.abs(records[:, 4]).astype(int)
+        for idx in range(atom_serials.shape[0]):
+            atom_i = int(atom_serials[idx, 0])
+            atom_j = int(atom_serials[idx, 1])
+            atom_k = int(atom_serials[idx, 2])
+            atom_l = int(atom_serials[idx, 3])
+            central = _find_improper_central(
+                (atom_i, atom_j, atom_k, atom_l), adjacency
+            )
+            if central is not None:
+                ordered = _order_improper(
+                    central, (atom_i, atom_j, atom_k, atom_l)
+                )
+                entries.append(
+                    (
+                        ordered[0],
+                        ordered[1],
+                        ordered[2],
+                        ordered[3],
+                        int(param_index[idx]),
+                        term_idx,
+                    )
+                )
+            term_idx += 1
+    if not entries:
+        return _empty_table(
+            [
+                "ID",
+                "idx",
+                "ijkl indices",
+                "ijkl names",
+                "ijkl types",
+                "force_constant",
+                "periodicity",
+                "phase",
+                "scee",
+                "scnb",
+            ]
+        )
+
+    entries_array = np.array(entries, dtype=int)
+    atoms = entries_array[:, :4]
+    param_index = entries_array[:, 4]
+    idx_values = entries_array[:, 5]
+    force = _lookup_params(dihedral_force, param_index)
+    periodicity = _lookup_params(dihedral_periodicity, param_index)
+    phase = _lookup_params(dihedral_phase, param_index)
+    scee = _lookup_params(scee_scale, param_index)
+    scnb = _lookup_params(scnb_scale, param_index)
+    rows: List[Dict[str, object]] = []
+    id_by_ijkl: Dict[Tuple[int, int, int, int], int] = {}
+    next_id = 1
+    for idx in range(entries_array.shape[0]):
+        atom_i, atom_j, atom_k, atom_l = atoms[idx]
+        key = (int(atom_i), int(atom_j), int(atom_k), int(atom_l))
+        if key not in id_by_ijkl:
+            id_by_ijkl[key] = next_id
+            next_id += 1
+        name_i, name_j, name_k, name_l = _lookup_ijkl_labels(
+            atom_names, atom_i, atom_j, atom_k, atom_l
+        )
         type_i, type_j, type_k, type_l = _lookup_ijkl_labels(
             amber_atom_types, atom_i, atom_j, atom_k, atom_l
         )

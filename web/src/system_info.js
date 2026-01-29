@@ -10,6 +10,7 @@ const INFO_TABS = [
   { id: "Bond", label: "Bond", key: "bond_types" },
   { id: "Angle", label: "Angle", key: "angle_types" },
   { id: "Dihedral", label: "Dihedral", key: "dihedral_types" },
+  { id: "Improper", label: "Improper", key: "improper_types" },
   { id: "1-4 Nonbonded", label: "1-4 Nonbonded", key: "one_four_nonbonded" },
   { id: "Non-bonded", label: "Non-bonded", key: "nonbonded_pairs" },
 ];
@@ -18,8 +19,79 @@ const HIGHLIGHT_COLORS = {
   Bond: "var(--mode-bond-bg)",
   Angle: "var(--mode-angle-bg)",
   Dihedral: "var(--mode-dihedral-bg)",
+  Improper: "var(--mode-dihedral-bg)",
   "1-4 Nonbonded": "var(--mode-14-bg)",
   "Non-bonded": "var(--mode-nonbonded-bg)",
+};
+const SORTABLE_COLUMNS = {
+  atom_types: [
+    "type_index",
+    "atom_count",
+    "pair_index",
+    "acoef",
+    "bcoef",
+    "rmin",
+    "epsilon",
+  ],
+  bond_types: [
+    "type_a",
+    "type_b",
+    "param_index",
+    "force_constant",
+    "equil_value",
+    "count",
+  ],
+  angle_types: [
+    "type_i",
+    "type_j",
+    "type_k",
+    "param_index",
+    "force_constant",
+    "equil_value",
+    "count",
+  ],
+  dihedral_types: [
+    "ID",
+    "idx",
+    "ijkl indices",
+    "force_constant",
+    "periodicity",
+    "phase",
+    "scee",
+    "scnb",
+  ],
+  improper_types: [
+    "ID",
+    "idx",
+    "ijkl indices",
+    "force_constant",
+    "periodicity",
+    "phase",
+    "scee",
+    "scnb",
+  ],
+  one_four_nonbonded: [
+    "type_a",
+    "type_b",
+    "param_index",
+    "scee",
+    "scnb",
+    "pair_index",
+    "acoef",
+    "bcoef",
+    "rmin",
+    "epsilon",
+    "count",
+  ],
+  nonbonded_pairs: [
+    "type_a",
+    "type_b",
+    "pair_index",
+    "acoef",
+    "bcoef",
+    "rmin",
+    "epsilon",
+  ],
 };
 
 /**
@@ -39,6 +111,7 @@ export function attachSystemInfoTabs() {
     button.textContent = tab.label;
     button.addEventListener("click", () => {
       state.systemInfoTab = tab.id;
+      state.systemInfoSort = null;
       renderSystemInfo();
     });
     tabs.appendChild(button);
@@ -80,6 +153,15 @@ export function attachSystemInfoRowActions() {
     if (!(target instanceof Element)) {
       return;
     }
+    const sortButton = target.closest(".system-info-sort");
+    if (sortButton && sortButton instanceof HTMLButtonElement) {
+      const tableKey = sortButton.dataset.table;
+      const column = sortButton.dataset.col;
+      if (tableKey && column) {
+        toggleSort(tableKey, column);
+      }
+      return;
+    }
     const button = target.closest(".system-info-select");
     if (!button || !(button instanceof HTMLButtonElement)) {
       return;
@@ -118,6 +200,7 @@ export function resetSystemInfoState() {
   state.systemInfoVisible = true;
   state.systemInfoTab = DEFAULT_SELECTION_MODE;
   state.systemInfoRowCursor = new Map();
+  state.systemInfoSort = null;
   const panel = document.getElementById("system-info-panel");
   if (panel) {
     panel.classList.remove("hidden");
@@ -214,7 +297,10 @@ function renderSystemInfo() {
     return;
   }
   const highlight = getActiveHighlight(table.columns);
-  content.innerHTML = buildTableHtml(tab.key, table.columns, table.rows || [], highlight);
+  const rows = table.rows || [];
+  const rowsWithIndex = rows.map((row, index) => ({ row, index }));
+  const sorted = applySort(tab.key, table.columns, rowsWithIndex);
+  content.innerHTML = buildTableHtml(tab.key, table.columns, sorted, highlight);
   requestAnimationFrame(() => {
     scrollHighlightedRow();
   });
@@ -257,18 +343,153 @@ function getActiveHighlight(columns) {
   return { matchEntries: [[highlight.column, highlight.value]] };
 }
 
+function isSortableColumn(tableKey, column) {
+  const allowed = SORTABLE_COLUMNS[tableKey] || [];
+  return allowed.includes(column);
+}
+
+function getSortState(tableKey, column) {
+  const sort = state.systemInfoSort;
+  if (!sort || sort.tableKey !== tableKey || sort.column !== column) {
+    return null;
+  }
+  return sort.direction || null;
+}
+
+function toggleSort(tableKey, column) {
+  if (!isSortableColumn(tableKey, column)) {
+    return;
+  }
+  const current = state.systemInfoSort;
+  let next = null;
+  if (current && current.tableKey === tableKey && current.column === column) {
+    if (current.direction === "asc") {
+      next = { tableKey, column, direction: "desc" };
+    } else if (current.direction === "desc") {
+      next = null;
+    } else {
+      next = { tableKey, column, direction: "asc" };
+    }
+  } else {
+    next = { tableKey, column, direction: "asc" };
+  }
+  state.systemInfoSort = next;
+  renderSystemInfo();
+}
+
+function parseIJKL(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parts = String(value)
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((num) => Number.isFinite(num));
+  if (parts.length < 4) {
+    return null;
+  }
+  return parts.slice(0, 4);
+}
+
+function getSortValue(column, row, columns) {
+  const idx = columns.indexOf(column);
+  if (idx < 0) {
+    return null;
+  }
+  const value = row[idx];
+  if (column === "ijkl indices") {
+    return parseIJKL(value);
+  }
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function compareIJKL(a, b) {
+  if (!a && !b) {
+    return 0;
+  }
+  if (!a) {
+    return 1;
+  }
+  if (!b) {
+    return -1;
+  }
+  for (let idx = 0; idx < 4; idx += 1) {
+    if (a[idx] !== b[idx]) {
+      return a[idx] - b[idx];
+    }
+  }
+  return 0;
+}
+
+function applySort(tableKey, columns, rowsWithIndex) {
+  const sort = state.systemInfoSort;
+  if (!sort || sort.tableKey !== tableKey || !sort.column || !sort.direction) {
+    return rowsWithIndex;
+  }
+  if (!isSortableColumn(tableKey, sort.column)) {
+    return rowsWithIndex;
+  }
+  const direction = sort.direction === "desc" ? -1 : 1;
+  const sorted = rowsWithIndex.slice();
+  sorted.sort((aEntry, bEntry) => {
+    const aValue = getSortValue(sort.column, aEntry.row, columns);
+    const bValue = getSortValue(sort.column, bEntry.row, columns);
+    let cmp = 0;
+    if (sort.column === "ijkl indices") {
+      cmp = compareIJKL(aValue, bValue);
+    } else {
+      if (aValue === null && bValue === null) {
+        cmp = 0;
+      } else if (aValue === null) {
+        cmp = 1;
+      } else if (bValue === null) {
+        cmp = -1;
+      } else {
+        cmp = aValue - bValue;
+      }
+    }
+    if (cmp === 0) {
+      cmp = aEntry.index - bEntry.index;
+    }
+    return cmp * direction;
+  });
+  return sorted;
+}
+
 function buildTableHtml(tableKey, columns, rows, highlight) {
   const hasRows = rows && rows.length;
   const headerHtml = columns
-    .map((col) => `<th>${escapeHtml(String(col))}</th>`)
+    .map((col) => {
+      const sortable = isSortableColumn(tableKey, col);
+      if (!sortable) {
+        return `<th>${escapeHtml(String(col))}</th>`;
+      }
+      const state = getSortState(tableKey, col);
+      const upClass = state === "asc" ? "sort-arrow active" : "sort-arrow";
+      const downClass = state === "desc" ? "sort-arrow active" : "sort-arrow";
+      return `<th><button class="system-info-sort" type="button" data-table="${escapeHtml(
+        String(tableKey)
+      )}" data-col="${escapeHtml(String(col))}"><span class="sort-label">${escapeHtml(
+        String(col)
+      )}</span><span class="sort-arrows"><span class="${upClass}">▲</span><span class="${downClass}">▼</span></span></button></th>`;
+    })
     .join("");
   const matchEntries = highlight && highlight.matchEntries ? highlight.matchEntries : [];
   const matchIndices = matchEntries
     .map(([col, value]) => [columns.indexOf(col), String(value)])
     .filter(([idx]) => idx >= 0);
-  const safeRows = hasRows ? rows : [columns.map(() => null)];
+  const safeRows = hasRows ? rows : [{ row: columns.map(() => null), index: 0 }];
   const bodyHtml = safeRows
-    .map((row, rowIndex) => {
+    .map((entry) => {
+      const row = entry.row;
+      const rowIndex = entry.index;
       let rowClass = "";
       if (matchIndices.length && row) {
         const matches = matchIndices.every(([idx, expected]) => {
@@ -330,6 +551,9 @@ export function updateSystemInfoHighlight(mode, interaction, atomInfo = null) {
   }
   const tabMatch = INFO_TABS.find((item) => item.id === mode);
   if (tabMatch) {
+    if (state.systemInfoTab !== tabMatch.id) {
+      state.systemInfoSort = null;
+    }
     state.systemInfoTab = tabMatch.id;
   }
   const setHighlight = (tab, match, colorMode) => {
@@ -392,6 +616,19 @@ export function updateSystemInfoHighlight(mode, interaction, atomInfo = null) {
       const ijkl = serials.slice(0, 4).map((value) => Number(value)).filter(Number.isFinite);
       if (ijkl.length === 4) {
         setHighlight("Dihedral", { "ijkl indices": ijkl.join(", ") }, "Dihedral");
+      }
+    }
+  } else if (
+    mode === "Improper" &&
+    interaction &&
+    Array.isArray(interaction.dihedrals) &&
+    interaction.dihedrals.length
+  ) {
+    const serials = interaction.dihedrals[0].serials || [];
+    if (serials.length >= 4) {
+      const ijkl = serials.slice(0, 4).map((value) => Number(value)).filter(Number.isFinite);
+      if (ijkl.length === 4) {
+        setHighlight("Improper", { "ijkl indices": ijkl.join(", ") }, "Improper");
       }
     }
   } else if (

@@ -16,6 +16,7 @@ from topview.services.loader import load_system_data
 from topview.services.parm7 import (
     load_parm7_deprecated_flags,
     load_parm7_descriptions,
+    parse_int_tokens,
 )
 from topview.services.system_info import (
     build_system_info_tables,
@@ -133,18 +134,25 @@ class Model:
             If no system is loaded or serials are invalid.
         """
 
+        mode_name = (mode or "").strip()
         with self._lock:
             if not self._state.loaded:
                 raise ModelError("not_loaded", "No system loaded")
             if not self._state.parm7_sections:
                 raise ModelError("not_loaded", "No parm7 sections available")
-            engine = HighlightEngine(
-                self._state.parm7_sections,
-                self._state.meta_by_serial,
-                self._state.int_section_cache,
-                self._state.float_section_cache,
-            )
-            highlights, interaction = engine.get_highlights(serials, mode=mode)
+            sections = self._state.parm7_sections
+            meta_by_serial = self._state.meta_by_serial
+            int_cache = self._state.int_section_cache
+            float_cache = self._state.float_section_cache
+        bond_adjacency = self._get_bond_adjacency() if mode_name == "Improper" else None
+        engine = HighlightEngine(
+            sections,
+            meta_by_serial,
+            int_cache,
+            float_cache,
+            bond_adjacency=bond_adjacency,
+        )
+        highlights, interaction = engine.get_highlights(serials, mode=mode)
         return {
             "ok": True,
             "highlights": highlights,
@@ -238,6 +246,7 @@ class Model:
             self._state.system_info_future = info_future
             self._state.system_info_selection_index = None
             self._state.system_info_selection_future = None
+            self._state.bond_adjacency = None
             self._state.load_timings = result.timings
             self._state.load_started_at = load_started_at
             self._state.loaded = True
@@ -536,6 +545,21 @@ class Model:
                 "total": 1,
             }
 
+        if table == "improper_types":
+            idx_value = _coerce_int(row_map.get("idx"))
+            if not idx_value:
+                raise ModelError("not_found", "No matches for row")
+            serials = selection_index.impropers_by_idx.get(idx_value)
+            if not serials:
+                raise ModelError("not_found", "No matches for row")
+            return {
+                "ok": True,
+                "mode": mode,
+                "serials": list(serials),
+                "index": 0,
+                "total": 1,
+            }
+
         if table == "one_four_nonbonded":
             key = _bond_key(row_map)
             selections = (
@@ -619,6 +643,30 @@ class Model:
                 str(exc),
             ) from exc
 
+    def _get_bond_adjacency(self) -> Dict[int, set[int]]:
+        with self._lock:
+            if not self._state.loaded:
+                raise ModelError("not_loaded", "No system loaded")
+            cached = self._state.bond_adjacency
+            if cached is not None:
+                return cached
+            sections = dict(self._state.parm7_sections)
+        adjacency: Dict[int, set[int]] = {}
+        for name in ("BONDS_INC_HYDROGEN", "BONDS_WITHOUT_HYDROGEN"):
+            section = sections.get(name)
+            if not section or not section.tokens:
+                continue
+            values = parse_int_tokens(section.tokens)
+            for idx in range(0, len(values) - 2, 3):
+                atom_a = abs(int(values[idx])) // 3 + 1
+                atom_b = abs(int(values[idx + 1])) // 3 + 1
+                adjacency.setdefault(atom_a, set()).add(atom_b)
+                adjacency.setdefault(atom_b, set()).add(atom_a)
+        with self._lock:
+            if self._state.bond_adjacency is None:
+                self._state.bond_adjacency = adjacency
+            return self._state.bond_adjacency
+
 
 def _mode_for_table(table: str) -> str:
     mapping = {
@@ -626,6 +674,7 @@ def _mode_for_table(table: str) -> str:
         "bond_types": "Bond",
         "angle_types": "Angle",
         "dihedral_types": "Dihedral",
+        "improper_types": "Improper",
         "one_four_nonbonded": "1-4 Nonbonded",
         "nonbonded_pairs": "Non-bonded",
     }
