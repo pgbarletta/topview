@@ -36,7 +36,7 @@ body {
   --parm7-font-size: 14pt;
   --info-pop-font-size: 12pt;
   --parm7-highlight: #fef3c7;
-  --viewer-highlight: #000000;
+  --viewer-highlight: #111827;
 }
 
 * {
@@ -83,7 +83,7 @@ body.dark-mode {
   --label-bg: #1f2937;
   --label-text: #f9fafb;
   --parm7-highlight: #374151;
-  --viewer-highlight: #000000;
+  --viewer-highlight: #f8fafc;
 }
 
 #toolbar {
