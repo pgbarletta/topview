@@ -21,6 +21,9 @@ const EMPTY_CLICK_HOLD_MS = 200;
  */
 export function requestRender() {
   if (state.viewMode !== "3d" || !state.viewer || state.renderScheduled) {
+    if (state.viewMode === "3d" && state.viewer && state.renderScheduled) {
+      state.renderPending = true;
+    }
     return;
   }
   state.renderScheduled = true;
@@ -28,6 +31,10 @@ export function requestRender() {
     state.renderScheduled = false;
     if (state.viewer) {
       state.viewer.render();
+    }
+    if (state.renderPending) {
+      state.renderPending = false;
+      requestRender();
     }
   });
 }

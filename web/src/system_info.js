@@ -1,8 +1,9 @@
-import { getSystemInfo, saveSystemInfoCsv } from "./bridge.js";
+import { getSystemInfo, getSystemInfoSelection, saveSystemInfoCsv } from "./bridge.js";
 import { DEFAULT_SELECTION_MODE, INFO_FONT_MAX, INFO_FONT_MIN } from "./constants.js";
+import { applySelectionFromSystemInfo } from "./selection.js";
 import { state } from "./state.js";
 import { escapeHtml, formatNumber } from "./utils.js";
-import { reportError } from "./ui.js";
+import { reportError, setStatus } from "./ui.js";
 
 const INFO_TABS = [
   { id: "Atom", label: "Atom", key: "atom_types" },
@@ -63,6 +64,36 @@ export function attachSystemInfoExport() {
 }
 
 /**
+ * Initialize delegated click handling for system info row selection.
+ */
+export function attachSystemInfoRowActions() {
+  const content = document.getElementById("system-info-content");
+  if (!content) {
+    return;
+  }
+  if (content.dataset.bound === "true") {
+    return;
+  }
+  content.dataset.bound = "true";
+  content.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const button = target.closest(".system-info-select");
+    if (!button || !(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const tableKey = button.dataset.table;
+    const rowIndex = Number(button.dataset.rowIndex);
+    if (!tableKey || !Number.isFinite(rowIndex) || rowIndex < 0) {
+      return;
+    }
+    handleSystemInfoSelection(button, tableKey, rowIndex);
+  });
+}
+
+/**
  * Update the info font size.
  * @param {number|string} value
  */
@@ -86,6 +117,7 @@ export function resetSystemInfoState() {
   state.systemInfo = null;
   state.systemInfoVisible = true;
   state.systemInfoTab = DEFAULT_SELECTION_MODE;
+  state.systemInfoRowCursor = new Map();
   const panel = document.getElementById("system-info-panel");
   if (panel) {
     panel.classList.remove("hidden");
@@ -174,13 +206,15 @@ function renderSystemInfo() {
   if (!content) {
     return;
   }
-  const table = getActiveTable();
+  const tab = getActiveTab();
+  const tables = state.systemInfo || {};
+  const table = tables[tab.key] || null;
   if (!table || !table.columns) {
     content.textContent = "No system info loaded.";
     return;
   }
   const highlight = getActiveHighlight(table.columns);
-  content.innerHTML = buildTableHtml(table.columns, table.rows || [], highlight);
+  content.innerHTML = buildTableHtml(tab.key, table.columns, table.rows || [], highlight);
   requestAnimationFrame(() => {
     scrollHighlightedRow();
   });
@@ -223,7 +257,8 @@ function getActiveHighlight(columns) {
   return { matchEntries: [[highlight.column, highlight.value]] };
 }
 
-function buildTableHtml(columns, rows, highlight) {
+function buildTableHtml(tableKey, columns, rows, highlight) {
+  const hasRows = rows && rows.length;
   const headerHtml = columns
     .map((col) => `<th>${escapeHtml(String(col))}</th>`)
     .join("");
@@ -231,9 +266,9 @@ function buildTableHtml(columns, rows, highlight) {
   const matchIndices = matchEntries
     .map(([col, value]) => [columns.indexOf(col), String(value)])
     .filter(([idx]) => idx >= 0);
-  const safeRows = rows && rows.length ? rows : [columns.map(() => null)];
+  const safeRows = hasRows ? rows : [columns.map(() => null)];
   const bodyHtml = safeRows
-    .map((row) => {
+    .map((row, rowIndex) => {
       let rowClass = "";
       if (matchIndices.length && row) {
         const matches = matchIndices.every(([idx, expected]) => {
@@ -251,10 +286,14 @@ function buildTableHtml(columns, rows, highlight) {
           return `<td>${escapeHtml(formatCell(value))}</td>`;
         })
         .join("");
-      return `<tr${rowClass}>${cells}</tr>`;
+      const disabled = hasRows ? "" : " disabled";
+      const button = `<button class="system-info-select" type="button" data-table="${escapeHtml(
+        String(tableKey)
+      )}" data-row-index="${rowIndex}"${disabled}>Select</button>`;
+      return `<tr${rowClass}><td class="system-info-select-cell">${button}</td>${cells}</tr>`;
     })
     .join("");
-  return `<table class="system-info-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+  return `<table class="system-info-table"><thead><tr><th>Select</th>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
 }
 
 function scrollHighlightedRow() {
@@ -395,6 +434,43 @@ export function updateSystemInfoHighlight(mode, interaction, atomInfo = null) {
   }
   if (state.systemInfo) {
     renderSystemInfo();
+  }
+}
+
+async function handleSystemInfoSelection(button, tableKey, rowIndex) {
+  const cursorKey = `${tableKey}:${rowIndex}`;
+  const cursor = state.systemInfoRowCursor.get(cursorKey) || 0;
+  button.disabled = true;
+  try {
+    const result = await getSystemInfoSelection(tableKey, rowIndex, cursor);
+    if (!result || !result.ok) {
+      const err = result && result.error ? result.error : null;
+      if (err && err.code === "not_found") {
+        setStatus("error", "No matches for that row");
+      } else {
+        const msg = err ? err.message : "Selection failed";
+        reportError(msg);
+      }
+      return;
+    }
+    const serials = Array.isArray(result.serials) ? result.serials : [];
+    const total = Number(result.total) || 0;
+    const index = Number(result.index) || 0;
+    const cleanSerials = serials
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+    if (!cleanSerials.length) {
+      reportError("No serials returned for selection.");
+      return;
+    }
+    state.systemInfoRowCursor.set(cursorKey, total ? (index + 1) % total : 0);
+    applySelectionFromSystemInfo(result.mode, cleanSerials);
+    const countLabel = total ? ` (${index + 1}/${total})` : "";
+    setStatus("success", `Selected ${result.mode}${countLabel}`);
+  } catch (err) {
+    reportError(String(err));
+  } finally {
+    button.disabled = false;
   }
 }
 

@@ -168,6 +168,10 @@ class ModelState:
         Cached system info tables payload.
     system_info_future
         Background future for system info table generation.
+    system_info_selection_index
+        Cached selection index for system info row selection.
+    system_info_selection_future
+        Background future for selection index generation.
     load_timings
         Timing breakdown for the last load.
     load_started_at
@@ -186,6 +190,8 @@ class ModelState:
     float_section_cache: Dict[str, List[float]] = field(default_factory=dict)
     system_info: Optional[Dict[str, Dict[str, object]]] = None
     system_info_future: Optional[Future] = None
+    system_info_selection_index: Optional[object] = None
+    system_info_selection_future: Optional[Future] = None
     load_timings: Optional[Dict[str, float]] = None
     load_started_at: Optional[float] = None
     loaded: bool = False

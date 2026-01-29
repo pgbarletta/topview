@@ -406,27 +406,46 @@ export function autoSelectParm7Section(mode, highlights) {
  * @param {string} mode
  * @returns {Promise<object|null>}
  */
-export function updateParm7Highlights(serials, mode) {
+export function fetchParm7Highlights(serials, mode) {
   if (!state.parm7Lines.length) {
-    renderParm7File([]);
-    return Promise.resolve(null);
+    return Promise.resolve({ highlights: [], interaction: null });
   }
   const list = Array.isArray(serials) ? serials : serials ? [serials] : [];
   const cleanSerials = list
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value));
   if (!cleanSerials.length) {
-    renderParm7File([]);
-    return Promise.resolve(null);
+    return Promise.resolve({ highlights: [], interaction: null });
   }
   return getParm7Highlights(cleanSerials, mode).then((result) => {
     if (!result || !result.ok) {
       const msg = result && result.error ? result.error.message : "Failed to highlight parm7";
       return Promise.reject(new Error(msg));
     }
-    const highlights = result.highlights || [];
-    autoSelectParm7Section(mode, highlights);
-    renderParm7File(highlights);
+    return {
+      highlights: result.highlights || [],
+      interaction: result.interaction || null,
+    };
+  });
+}
+
+export function applyParm7SelectionHighlights(mode, highlights) {
+  if (!state.parm7Lines.length) {
+    renderParm7File([]);
+    return;
+  }
+  const safeHighlights = Array.isArray(highlights) ? highlights : [];
+  autoSelectParm7Section(mode, safeHighlights);
+  renderParm7File(safeHighlights);
+}
+
+export function updateParm7Highlights(serials, mode) {
+  if (!state.parm7Lines.length) {
+    renderParm7File([]);
+    return Promise.resolve(null);
+  }
+  return fetchParm7Highlights(serials, mode).then((result) => {
+    applyParm7SelectionHighlights(mode, result.highlights || []);
     return result.interaction || null;
   });
 }
