@@ -113,6 +113,10 @@ function getHighlightBondRadius() {
   return 0.32;
 }
 
+function getHighlightColor() {
+  return state.darkMode ? "#f8fafc" : HIGHLIGHT_COLOR;
+}
+
 function addHighlightSphere(center, radius) {
   if (!state.viewer || !center) {
     return;
@@ -121,14 +125,14 @@ function addHighlightSphere(center, radius) {
     state.viewer.addSphere({
       center: center,
       radius: radius,
-      color: HIGHLIGHT_COLOR,
+      color: getHighlightColor(),
       opacity: HIGHLIGHT_ATOM_OPACITY,
     });
     return;
   }
   if (typeof state.viewer.addShape === "function") {
     const shape = state.viewer.addShape({
-      color: HIGHLIGHT_COLOR,
+      color: getHighlightColor(),
       opacity: HIGHLIGHT_ATOM_OPACITY,
     });
     if (shape && typeof shape.addSphere === "function") {
@@ -146,14 +150,14 @@ function addHighlightCylinder(start, end, radius) {
       start: start,
       end: end,
       radius: radius,
-      color: HIGHLIGHT_COLOR,
+      color: getHighlightColor(),
       opacity: HIGHLIGHT_LINE_OPACITY,
     });
     return;
   }
   if (typeof state.viewer.addShape === "function") {
     const shape = state.viewer.addShape({
-      color: HIGHLIGHT_COLOR,
+      color: getHighlightColor(),
       opacity: HIGHLIGHT_LINE_OPACITY,
     });
     if (shape && typeof shape.addCylinder === "function") {

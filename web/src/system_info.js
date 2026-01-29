@@ -54,6 +54,7 @@ const SORTABLE_COLUMNS = {
     "ID",
     "idx",
     "ijkl indices",
+    "amber_rotatable",
     "force_constant",
     "periodicity",
     "phase",
@@ -399,6 +400,15 @@ function getSortValue(column, row, columns) {
   const value = row[idx];
   if (column === "ijkl indices") {
     return parseIJKL(value);
+  }
+  if (column === "amber_rotatable") {
+    if (value === "T") {
+      return 1;
+    }
+    if (value === "F") {
+      return 0;
+    }
+    return null;
   }
   if (value === null || value === undefined || value === "") {
     return null;

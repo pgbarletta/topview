@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -62,6 +62,7 @@ def build_system_info_tables(
     amber_atom_types = _parse_string_section(
         sections, "AMBER_ATOM_TYPE", natom
     )
+    masses = _parse_float_section(sections, "MASS", natom)
     nonbond_index = _parse_int_section(
         sections, "NONBONDED_PARM_INDEX", ntypes * ntypes
     )
@@ -127,6 +128,9 @@ def build_system_info_tables(
         dihedral_phase,
         scee_scale,
         scnb_scale,
+        nbondh,
+        mbona,
+        masses,
     )
     improper_df = _build_improper_table(
         sections,
@@ -452,6 +456,81 @@ def _build_bond_adjacency(
     return adjacency
 
 
+def _build_rotatable_bonds(
+    sections: Dict[str, Parm7Section],
+    nbondh: int,
+    mbona: int,
+    nphih: int,
+    mphia: int,
+    masses: np.ndarray,
+) -> Set[Tuple[int, int]]:
+    bonds: Set[Tuple[int, int]] = set()
+    for name, count in (
+        ("BONDS_INC_HYDROGEN", nbondh),
+        ("BONDS_WITHOUT_HYDROGEN", mbona),
+    ):
+        values = _parse_int_section(sections, name, count * 3)
+        if values.size == 0:
+            continue
+        records = values.reshape(-1, 3)
+        atom_serials = _pointer_to_serial(records[:, :2])
+        for row in atom_serials:
+            atom_a = int(row[0])
+            atom_b = int(row[1])
+            bonds.add(_sorted_pair(atom_a, atom_b))
+
+    heavy_bonds: Set[Tuple[int, int]] = set()
+    for atom_a, atom_b in bonds:
+        if atom_a <= 0 or atom_b <= 0:
+            continue
+        if atom_a > masses.size or atom_b > masses.size:
+            continue
+        if masses[atom_a - 1] > 3.1 and masses[atom_b - 1] > 3.1:
+            heavy_bonds.add((atom_a, atom_b))
+
+    central_bonds: Set[Tuple[int, int]] = set()
+    terminal_triplets: Dict[int, List[Tuple[int, int, int]]] = {}
+    for name, count in (
+        ("DIHEDRALS_INC_HYDROGEN", nphih),
+        ("DIHEDRALS_WITHOUT_HYDROGEN", mphia),
+    ):
+        values = _parse_int_section(sections, name, count * 5)
+        if values.size == 0:
+            continue
+        records = values.reshape(-1, 5)
+        atom_serials = _pointer_to_serial(records[:, :4])
+        for row in atom_serials:
+            atom_i = int(row[0])
+            atom_j = int(row[1])
+            atom_k = int(row[2])
+            atom_l = int(row[3])
+            central_bonds.add(_sorted_pair(atom_j, atom_k))
+            terminal_triplets.setdefault(atom_i, []).append(
+                (atom_j, atom_k, atom_l)
+            )
+            terminal_triplets.setdefault(atom_l, []).append(
+                (atom_i, atom_j, atom_k)
+            )
+
+    rotatable: Set[Tuple[int, int]] = set()
+    for atom_a, atom_b in heavy_bonds:
+        if (atom_a, atom_b) not in central_bonds:
+            continue
+        neighbors_a: Set[int] = set()
+        neighbors_b: Set[int] = set()
+        for triple in terminal_triplets.get(atom_a, []):
+            if atom_b in triple:
+                continue
+            neighbors_a.update(triple)
+        for triple in terminal_triplets.get(atom_b, []):
+            if atom_a in triple:
+                continue
+            neighbors_b.update(triple)
+        if neighbors_a.isdisjoint(neighbors_b):
+            rotatable.add((atom_a, atom_b))
+    return rotatable
+
+
 def _build_angle_table(
     sections: Dict[str, Parm7Section],
     atom_type_indices: np.ndarray,
@@ -553,7 +632,13 @@ def _build_dihedral_table(
     dihedral_phase: np.ndarray,
     scee_scale: np.ndarray,
     scnb_scale: np.ndarray,
+    nbondh: int,
+    mbona: int,
+    masses: np.ndarray,
 ) -> pd.DataFrame:
+    rotatable_bonds = _build_rotatable_bonds(
+        sections, nbondh, mbona, nphih, mphia, masses
+    )
     entries: List[Tuple[int, int, int, int, int, int]] = []
     term_idx = 1
     for name, count in (
@@ -581,6 +666,7 @@ def _build_dihedral_table(
                 "ijkl indices",
                 "ijkl names",
                 "ijkl types",
+                "amber_rotatable",
                 "force_constant",
                 "periodicity",
                 "phase",
@@ -611,6 +697,8 @@ def _build_dihedral_table(
         type_i, type_j, type_k, type_l = _lookup_ijkl_labels(
             amber_atom_types, atom_i, atom_j, atom_k, atom_l
         )
+        bond_key = _sorted_pair(int(atom_j), int(atom_k))
+        rotatable = "T" if bond_key in rotatable_bonds else "F"
         rows.append(
             {
                 "ID": id_by_ijkl[key],
@@ -618,6 +706,7 @@ def _build_dihedral_table(
                 "ijkl indices": f"{atom_i}, {atom_j}, {atom_k}, {atom_l}",
                 "ijkl names": f"{name_i}, {name_j}, {name_k}, {name_l}",
                 "ijkl types": f"{type_i}, {type_j}, {type_k}, {type_l}",
+                "amber_rotatable": rotatable,
                 "force_constant": force[idx],
                 "periodicity": periodicity[idx],
                 "phase": phase[idx],
@@ -633,6 +722,7 @@ def _build_dihedral_table(
             "ijkl indices",
             "ijkl names",
             "ijkl types",
+            "amber_rotatable",
             "force_constant",
             "periodicity",
             "phase",
@@ -970,6 +1060,10 @@ def _lookup_params(values: np.ndarray, indices: np.ndarray) -> np.ndarray:
     valid = (indices > 0) & (indices <= values.size)
     result[valid] = values[indices[valid] - 1]
     return result
+
+
+def _sorted_pair(a: int, b: int) -> Tuple[int, int]:
+    return (a, b) if a <= b else (b, a)
 
 
 
