@@ -117,6 +117,14 @@ function getHighlightColor() {
   return state.darkMode ? "#f8fafc" : HIGHLIGHT_COLOR;
 }
 
+function getHighlightAtomOpacity() {
+  const base = HIGHLIGHT_ATOM_OPACITY;
+  if (state.darkMode) {
+    return Math.min(0.55, base * 2);
+  }
+  return Math.min(0.45, base * 1.6);
+}
+
 function addHighlightSphere(center, radius) {
   if (!state.viewer || !center) {
     return;
@@ -126,14 +134,14 @@ function addHighlightSphere(center, radius) {
       center: center,
       radius: radius,
       color: getHighlightColor(),
-      opacity: HIGHLIGHT_ATOM_OPACITY,
+      opacity: getHighlightAtomOpacity(),
     });
     return;
   }
   if (typeof state.viewer.addShape === "function") {
     const shape = state.viewer.addShape({
       color: getHighlightColor(),
-      opacity: HIGHLIGHT_ATOM_OPACITY,
+      opacity: getHighlightAtomOpacity(),
     });
     if (shape && typeof shape.addSphere === "function") {
       shape.addSphere({ center: center, radius: radius });
