@@ -76,6 +76,20 @@ export function getSystemInfo() {
 }
 
 /**
+ * @param {string} table
+ * @param {number} rowIndex
+ * @param {number} cursor
+ * @returns {Promise<any>}
+ */
+export function getSystemInfoSelection(table, rowIndex, cursor) {
+  return callApi("get_system_info_selection", {
+    table: table,
+    row_index: rowIndex,
+    cursor: cursor,
+  });
+}
+
+/**
  * @param {string} csvText
  * @param {string} name
  * @returns {Promise<any>}

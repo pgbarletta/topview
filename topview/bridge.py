@@ -357,6 +357,55 @@ class Api:
             logger.exception("get_system_info unexpected error")
             return error_result("unexpected", "Unexpected error", str(exc))
 
+    def get_system_info_selection(self, payload: Dict[str, object]):
+        """Return a selection for a system info table row.
+
+        Parameters
+        ----------
+        payload
+            Payload containing table, row_index, and cursor.
+
+        Returns
+        -------
+        dict
+            Selection payload.
+        """
+
+        if not isinstance(payload, dict):
+            return error_result("invalid_input", "payload must be an object")
+        table = payload.get("table")
+        row_index = payload.get("row_index")
+        cursor = payload.get("cursor", 0)
+        if table is None or row_index is None:
+            return error_result("invalid_input", "table and row_index are required")
+        try:
+            table_name = str(table)
+            row_idx = int(row_index)
+            cursor_idx = int(cursor)
+        except (TypeError, ValueError):
+            return error_result("invalid_input", "row_index and cursor must be integers")
+        if row_idx < 0 or cursor_idx < 0:
+            return error_result(
+                "invalid_input", "row_index and cursor must be >= 0"
+            )
+        try:
+            logger.debug(
+                "get_system_info_selection table=%s row=%s cursor=%s",
+                table_name,
+                row_idx,
+                cursor_idx,
+            )
+            future = self._worker.submit(
+                self._model.get_system_info_selection, table_name, row_idx, cursor_idx
+            )
+            return future.result()
+        except ModelError as exc:
+            logger.exception("get_system_info_selection failed")
+            return exc.to_result()
+        except Exception as exc:
+            logger.exception("get_system_info_selection unexpected error")
+            return error_result("unexpected", "Unexpected error", str(exc))
+
     def save_system_info_csv(self, payload: Dict[str, object]):
         """Save a CSV payload to disk via a save dialog.
 
