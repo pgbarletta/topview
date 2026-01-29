@@ -15,6 +15,7 @@ export const state = {
   systemInfoTab: DEFAULT_SELECTION_MODE,
   systemInfoHighlight: null,
   systemInfoRowCursor: new Map(),
+  systemInfoSort: null,
   threeDmolPromise: null,
   parm7Lines: [],
   parm7Sections: [],

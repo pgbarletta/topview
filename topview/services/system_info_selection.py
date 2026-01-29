@@ -17,6 +17,7 @@ class SystemInfoSelectionIndex:
     bonds_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]]
     angles_by_key: Dict[Tuple[int, int, int, int], List[Tuple[int, int, int]]]
     dihedrals_by_idx: Dict[int, Tuple[int, int, int, int]]
+    impropers_by_idx: Dict[int, Tuple[int, int, int, int]]
     one_four_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]]
 
 
@@ -50,6 +51,7 @@ def build_system_info_selection_index(
     atom_serials_by_type = _build_atom_serials_by_type(atom_type_indices)
 
     bonds_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]] = {}
+    adjacency: Dict[int, set[int]] = {}
     nbondh = _pointer_value(pointers, "NBONH")
     mbona = _pointer_value(pointers, "MBONA")
     for name, count in (
@@ -57,7 +59,7 @@ def build_system_info_selection_index(
         ("BONDS_WITHOUT_HYDROGEN", mbona),
     ):
         values = _parse_int_section(sections, name, count * 3)
-        _accumulate_bond_records(values, atom_type_indices, bonds_by_key)
+        _accumulate_bond_records(values, atom_type_indices, bonds_by_key, adjacency)
 
     angles_by_key: Dict[Tuple[int, int, int, int], List[Tuple[int, int, int]]] = {}
     nth_eth = _pointer_value(pointers, "NTHETH")
@@ -70,6 +72,7 @@ def build_system_info_selection_index(
         _accumulate_angle_records(values, atom_type_indices, angles_by_key)
 
     dihedrals_by_idx: Dict[int, Tuple[int, int, int, int]] = {}
+    impropers_by_idx: Dict[int, Tuple[int, int, int, int]] = {}
     one_four_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]] = {}
     nphih = _pointer_value(pointers, "NPHIH")
     mphia = _pointer_value(pointers, "MPHIA")
@@ -85,6 +88,8 @@ def build_system_info_selection_index(
             term_idx,
             dihedrals_by_idx,
             one_four_by_key,
+            adjacency,
+            impropers_by_idx,
         )
 
     return SystemInfoSelectionIndex(
@@ -92,6 +97,7 @@ def build_system_info_selection_index(
         bonds_by_key=bonds_by_key,
         angles_by_key=angles_by_key,
         dihedrals_by_idx=dihedrals_by_idx,
+        impropers_by_idx=impropers_by_idx,
         one_four_by_key=one_four_by_key,
     )
 
@@ -180,6 +186,7 @@ def _accumulate_bond_records(
     values: Sequence[int],
     atom_type_indices: Sequence[int],
     bonds_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]],
+    adjacency: Optional[Dict[int, set[int]]] = None,
 ) -> None:
     if not values:
         return
@@ -187,6 +194,9 @@ def _accumulate_bond_records(
         raw_a, raw_b, raw_param = values[idx : idx + 3]
         serial_a = _pointer_to_serial(raw_a)
         serial_b = _pointer_to_serial(raw_b)
+        if adjacency is not None:
+            adjacency.setdefault(serial_a, set()).add(serial_b)
+            adjacency.setdefault(serial_b, set()).add(serial_a)
         type_a = _type_index(atom_type_indices, serial_a)
         type_b = _type_index(atom_type_indices, serial_b)
         if type_a is None or type_b is None:
@@ -230,6 +240,8 @@ def _accumulate_dihedral_records(
     term_idx: int,
     dihedrals_by_idx: Dict[int, Tuple[int, int, int, int]],
     one_four_by_key: Dict[Tuple[int, int, int], List[Tuple[int, int]]],
+    adjacency: Optional[Dict[int, set[int]]] = None,
+    impropers_by_idx: Optional[Dict[int, Tuple[int, int, int, int]]] = None,
 ) -> int:
     if not values:
         return term_idx
@@ -240,6 +252,14 @@ def _accumulate_dihedral_records(
         serial_k = _pointer_to_serial(raw_k)
         serial_l = _pointer_to_serial(raw_l)
         dihedrals_by_idx[term_idx] = (serial_i, serial_j, serial_k, serial_l)
+        if impropers_by_idx is not None and adjacency:
+            central = _find_improper_central(
+                (serial_i, serial_j, serial_k, serial_l), adjacency
+            )
+            if central is not None:
+                impropers_by_idx[term_idx] = _order_improper(
+                    central, (serial_i, serial_j, serial_k, serial_l)
+                )
         term_idx += 1
         if raw_k < 0 or raw_l < 0:
             continue
@@ -253,6 +273,30 @@ def _accumulate_dihedral_records(
             (serial_i, serial_l)
         )
     return term_idx
+
+
+def _find_improper_central(
+    serials: Sequence[int], adjacency: Dict[int, set[int]]
+) -> Optional[int]:
+    candidates: List[int] = []
+    for candidate in serials:
+        neighbors = adjacency.get(candidate, set())
+        if all(other in neighbors for other in serials if other != candidate):
+            candidates.append(int(candidate))
+    return min(candidates) if candidates else None
+
+
+def _order_improper(central: int, serials: Sequence[int]) -> Tuple[int, int, int, int]:
+    others: List[int] = []
+    for value in serials:
+        if int(value) == int(central):
+            continue
+        others.append(int(value))
+    others.sort()
+    ordered = [int(central)] + others
+    while len(ordered) < 4:
+        ordered.append(int(central))
+    return (ordered[0], ordered[1], ordered[2], ordered[3])
 
 
 def _pointer_to_serial(value: int) -> int:

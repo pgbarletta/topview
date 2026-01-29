@@ -678,11 +678,11 @@ function highlightSerials2d(serials) {
     selection.forEach((serial) => {
       apply2dAtomHighlight(serial);
     });
-    const drawLines =
+    const drawChainLines =
       state.selectionMode === "Bond" ||
       state.selectionMode === "Angle" ||
       state.selectionMode === "Dihedral";
-    if (drawLines) {
+    if (drawChainLines) {
       for (let idx = 0; idx < selection.length - 1; idx += 1) {
         const serialA = selection[idx];
         const serialB = selection[idx + 1];
@@ -691,6 +691,14 @@ function highlightSerials2d(serials) {
         }
         apply2dBondHighlight(serialA, serialB);
       }
+    } else if (state.selectionMode === "Improper") {
+      const central = selection[0];
+      selection.slice(1).forEach((serial) => {
+        if (!areBonded(central, serial)) {
+          return;
+        }
+        apply2dBondHighlight(central, serial);
+      });
     }
   }
   state.currentSelection = selection;
@@ -776,11 +784,11 @@ export function highlightSerials(serials) {
         addHighlightSphere(center, radius);
       }
     });
-    const drawLines =
+    const drawChainLines =
       state.selectionMode === "Bond" ||
       state.selectionMode === "Angle" ||
       state.selectionMode === "Dihedral";
-    if (drawLines) {
+    if (drawChainLines) {
       for (let idx = 0; idx < selection.length - 1; idx += 1) {
         const serialA = selection[idx];
         const serialB = selection[idx + 1];
@@ -795,6 +803,20 @@ export function highlightSerials(serials) {
           addHighlightCylinder(start, end, bondRadius);
         }
       }
+    } else if (state.selectionMode === "Improper") {
+      const central = selection[0];
+      selection.slice(1).forEach((serial) => {
+        if (!areBonded(central, serial)) {
+          return;
+        }
+        const atomA = state.atomBySerial.get(central);
+        const atomB = state.atomBySerial.get(serial);
+        const start = atomPosition(atomA);
+        const end = atomPosition(atomB);
+        if (start && end) {
+          addHighlightCylinder(start, end, bondRadius);
+        }
+      });
     }
   }
   requestRender();
@@ -866,7 +888,28 @@ function buildDihedralIndexLabel(serials) {
   return { text, position };
 }
 
+function buildImproperIndexLabel(serials) {
+  if (!serials || serials.length < 4) {
+    return null;
+  }
+  const center = atomPosition(state.atomBySerial.get(serials[0]));
+  const position =
+    center || centroid(serials.map((s) => atomPosition(state.atomBySerial.get(s))));
+  const text = `Improper ${serials.join("-")}`;
+  return { text, position };
+}
+
 function getDihedralLabelSerials(interaction) {
+  if (interaction && Array.isArray(interaction.dihedrals) && interaction.dihedrals.length) {
+    const serials = interaction.dihedrals[0].serials || [];
+    if (serials.length >= 4) {
+      return serials.slice(0, 4);
+    }
+  }
+  return state.selectionSerials;
+}
+
+function getImproperLabelSerials(interaction) {
   if (interaction && Array.isArray(interaction.dihedrals) && interaction.dihedrals.length) {
     const serials = interaction.dihedrals[0].serials || [];
     if (serials.length >= 4) {
@@ -989,6 +1032,11 @@ export function renderInteractionLabels(interaction) {
     labels.push(...buildAngleLabels(interaction.angles));
   } else if (interaction.mode === "Dihedral") {
     const label = buildDihedralIndexLabel(getDihedralLabelSerials(interaction));
+    if (label) {
+      labels.push(label);
+    }
+  } else if (interaction.mode === "Improper") {
+    const label = buildImproperIndexLabel(getImproperLabelSerials(interaction));
     if (label) {
       labels.push(label);
     }

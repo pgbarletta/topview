@@ -31,6 +31,7 @@ class HighlightEngine:
         meta_by_serial: Dict[int, AtomMeta],
         int_cache: Dict[str, List[int]],
         float_cache: Dict[str, List[float]],
+        bond_adjacency: Optional[Dict[int, set[int]]] = None,
     ) -> None:
         """Initialize the highlight engine.
 
@@ -44,12 +45,15 @@ class HighlightEngine:
             Cached integer section values.
         float_cache
             Cached float section values.
+        bond_adjacency
+            Optional adjacency map for bonded atoms.
         """
 
         self._sections = sections
         self._meta_by_serial = meta_by_serial
         self._int_cache = int_cache
         self._float_cache = float_cache
+        self._bond_adjacency = bond_adjacency
 
     def build_atom_highlights(self, meta: AtomMeta) -> List[Dict[str, object]]:
         """Compute base parm7 highlights for a single atom.
@@ -173,6 +177,12 @@ class HighlightEngine:
                 "mode": normalized_mode,
                 "dihedrals": self._extract_dihedral_params(serials),
             }
+        elif normalized_mode == "Improper":
+            self._highlight_improper_entries(highlights, seen, serials)
+            interaction = {
+                "mode": normalized_mode,
+                "dihedrals": self._extract_improper_params(serials),
+            }
         elif normalized_mode == "1-4 Nonbonded":
             one_four = self._extract_14_params(serials)
             pair_serials = [entry["serials"] for entry in one_four] if one_four else None
@@ -288,6 +298,67 @@ class HighlightEngine:
         if len(serials) < 4:
             return False
         return sorted((a, b, c, d)) == sorted(serials[:4])
+
+    def _get_bond_adjacency(self) -> Dict[int, set[int]]:
+        if self._bond_adjacency is not None:
+            return self._bond_adjacency
+        adjacency: Dict[int, set[int]] = {}
+        for name in ("BONDS_INC_HYDROGEN", "BONDS_WITHOUT_HYDROGEN"):
+            section = self._sections.get(name)
+            if not section or not section.tokens:
+                continue
+            values = self._get_int_section(name, section)
+            for idx in range(0, len(values) - 2, 3):
+                atom_a = self._pointer_to_serial(values[idx])
+                atom_b = self._pointer_to_serial(values[idx + 1])
+                adjacency.setdefault(atom_a, set()).add(atom_b)
+                adjacency.setdefault(atom_b, set()).add(atom_a)
+        self._bond_adjacency = adjacency
+        return adjacency
+
+    @staticmethod
+    def _order_improper(central: int, serials: Sequence[int]) -> List[int]:
+        others: List[int] = []
+        for value in serials:
+            try:
+                serial = int(value)
+            except (TypeError, ValueError):
+                continue
+            if serial == central:
+                continue
+            others.append(serial)
+        others.sort()
+        return [int(central)] + others
+
+    def _infer_improper_central(self, serials: Sequence[int]) -> Optional[int]:
+        if len(serials) < 4:
+            return None
+        adjacency = self._get_bond_adjacency()
+        if not adjacency:
+            return None
+        clean: List[int] = []
+        for value in serials[:4]:
+            try:
+                clean.append(int(value))
+            except (TypeError, ValueError):
+                return None
+        candidates: List[int] = []
+        for candidate in clean:
+            neighbors = adjacency.get(candidate, set())
+            if all(other in neighbors for other in clean if other != candidate):
+                candidates.append(candidate)
+        return min(candidates) if candidates else None
+
+    def _is_improper_record(
+        self, central: int, record_serials: Sequence[int]
+    ) -> bool:
+        adjacency = self._get_bond_adjacency()
+        if not adjacency:
+            return False
+        neighbors = adjacency.get(int(central), set())
+        return all(
+            int(other) in neighbors for other in record_serials if int(other) != int(central)
+        )
 
     def _add_highlight(
         self,
@@ -547,6 +618,57 @@ class HighlightEngine:
                 results.append(
                     {
                         "serials": [atom_i, atom_j, atom_k, atom_l],
+                        "param_index": param_index,
+                        "force_constant": self._get_param_value(
+                            "DIHEDRAL_FORCE_CONSTANT", param_index
+                        ),
+                        "periodicity": self._get_param_value(
+                            "DIHEDRAL_PERIODICITY", param_index
+                        ),
+                        "phase": self._get_param_value(
+                            "DIHEDRAL_PHASE", param_index
+                        ),
+                        "scee": self._get_param_value(
+                            "SCEE_SCALE_FACTOR", param_index
+                        ),
+                        "scnb": self._get_param_value(
+                            "SCNB_SCALE_FACTOR", param_index
+                        ),
+                    }
+                )
+        return results
+
+    def _extract_improper_params(
+        self, serials: Sequence[int]
+    ) -> List[Dict[str, object]]:
+        if len(serials) < 4:
+            return []
+        central = self._infer_improper_central(serials)
+        if central is None:
+            return []
+        ordered = self._order_improper(central, serials[:4])
+        target_set = {int(value) for value in ordered}
+        results: List[Dict[str, object]] = []
+        for name in ("DIHEDRALS_INC_HYDROGEN", "DIHEDRALS_WITHOUT_HYDROGEN"):
+            section = self._sections.get(name)
+            if not section or not section.tokens:
+                continue
+            values = self._get_int_section(name, section)
+            for idx in range(0, len(values) - 4, 5):
+                raw_i, raw_j, raw_k, raw_l, raw_param = values[idx : idx + 5]
+                atom_i = self._pointer_to_serial(raw_i)
+                atom_j = self._pointer_to_serial(raw_j)
+                atom_k = self._pointer_to_serial(raw_k)
+                atom_l = self._pointer_to_serial(raw_l)
+                record = [atom_i, atom_j, atom_k, atom_l]
+                if target_set != set(record):
+                    continue
+                if not self._is_improper_record(central, record):
+                    continue
+                param_index = abs(raw_param)
+                results.append(
+                    {
+                        "serials": ordered,
                         "param_index": param_index,
                         "force_constant": self._get_param_value(
                             "DIHEDRAL_FORCE_CONSTANT", param_index
@@ -872,6 +994,52 @@ class HighlightEngine:
                 if not self._match_quad_unordered(
                     atom_i, atom_j, atom_k, atom_l, serials
                 ):
+                    continue
+                self._add_highlight(highlights, seen, section, idx)
+                self._add_highlight(highlights, seen, section, idx + 1)
+                self._add_highlight(highlights, seen, section, idx + 2)
+                self._add_highlight(highlights, seen, section, idx + 3)
+                self._add_highlight(highlights, seen, section, idx + 4)
+                param_index = abs(raw_param)
+                for param_section in (
+                    "DIHEDRAL_FORCE_CONSTANT",
+                    "DIHEDRAL_PERIODICITY",
+                    "DIHEDRAL_PHASE",
+                    "SCEE_SCALE_FACTOR",
+                    "SCNB_SCALE_FACTOR",
+                ):
+                    self._add_param_highlight(
+                        highlights, seen, param_section, param_index
+                    )
+
+    def _highlight_improper_entries(
+        self,
+        highlights: List[Dict[str, object]],
+        seen: set,
+        serials: Sequence[int],
+    ) -> None:
+        if len(serials) < 4:
+            return
+        central = self._infer_improper_central(serials)
+        if central is None:
+            return
+        ordered = self._order_improper(central, serials[:4])
+        target_set = {int(value) for value in ordered}
+        for name in ("DIHEDRALS_INC_HYDROGEN", "DIHEDRALS_WITHOUT_HYDROGEN"):
+            section = self._sections.get(name)
+            if not section or not section.tokens:
+                continue
+            values = self._get_int_section(name, section)
+            for idx in range(0, len(values) - 4, 5):
+                raw_i, raw_j, raw_k, raw_l, raw_param = values[idx : idx + 5]
+                atom_i = self._pointer_to_serial(raw_i)
+                atom_j = self._pointer_to_serial(raw_j)
+                atom_k = self._pointer_to_serial(raw_k)
+                atom_l = self._pointer_to_serial(raw_l)
+                record = [atom_i, atom_j, atom_k, atom_l]
+                if target_set != set(record):
+                    continue
+                if not self._is_improper_record(central, record):
                     continue
                 self._add_highlight(highlights, seen, section, idx)
                 self._add_highlight(highlights, seen, section, idx + 1)

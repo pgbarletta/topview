@@ -123,6 +123,17 @@ export function formatInteractionDetails(mode, interaction) {
         formatNumber(term.scnb),
       ]);
     });
+  } else if (mode === "Improper") {
+    headers = ["k", "n", "phase", "SCEE", "SCNB"];
+    (interaction.dihedrals || []).forEach((term) => {
+      rows.push([
+        formatNumber(term.force_constant),
+        formatNumber(term.periodicity),
+        formatNumber(term.phase),
+        formatNumber(term.scee),
+        formatNumber(term.scnb),
+      ]);
+    });
   } else if (mode === "1-4 Nonbonded") {
     headers = ["SCEE", "SCNB", "Rmin", "eps", "A", "B"];
     const nb = interaction.nonbonded || null;
@@ -212,6 +223,12 @@ export function renderSelectionSummary() {
     ) {
       displaySerials = state.currentInteraction.dihedrals[0].serials || displaySerials;
     } else if (
+      state.selectionMode === "Improper" &&
+      Array.isArray(state.currentInteraction.dihedrals) &&
+      state.currentInteraction.dihedrals.length
+    ) {
+      displaySerials = state.currentInteraction.dihedrals[0].serials || displaySerials;
+    } else if (
       state.selectionMode === "1-4 Nonbonded" &&
       Array.isArray(state.currentInteraction.one_four) &&
       state.currentInteraction.one_four.length
@@ -232,6 +249,8 @@ export function renderSelectionSummary() {
     title = "Angle atoms";
   } else if (state.selectionMode === "Dihedral") {
     title = "Dihedral atoms";
+  } else if (state.selectionMode === "Improper") {
+    title = "Improper atoms";
   } else if (state.selectionMode === "1-4 Nonbonded") {
     title = "1-4 nonbonded atoms";
   } else if (state.selectionMode === "Non-bonded") {

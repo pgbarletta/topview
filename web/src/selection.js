@@ -44,6 +44,17 @@ function normalizeSerials(serials) {
   return list.map((value) => Number(value)).filter(Number.isFinite);
 }
 
+function isImproperSelection(serials) {
+  if (!Array.isArray(serials) || serials.length !== 4) {
+    return false;
+  }
+  const [central, ...others] = serials;
+  if (!central || new Set(serials).size !== 4) {
+    return false;
+  }
+  return others.every((serial) => areBonded(central, serial));
+}
+
 function bumpSelectionNonce() {
   state.selectionNonce = (state.selectionNonce || 0) + 1;
   return state.selectionNonce;
@@ -141,6 +152,9 @@ function computeViewerSelection(serial) {
   }
 
   if (nextSelection.length === 4) {
+    if (isImproperSelection(nextSelection)) {
+      return { serials: nextSelection, mode: "Improper" };
+    }
     const path = findBondPath(nextSelection);
     if (path) {
       return { serials: path, mode: "Dihedral" };
