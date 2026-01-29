@@ -8,43 +8,42 @@ Offline desktop viewer for AMBER parm7 + rst7 files (or parm7-only 2D depictions
 - `pywebview`
 - `MDAnalysis`
 - `rdkit` (for parm7-only 2D depictions)
+- `gtk` (optionally)
 
-## Vendor 3Dmol
+## Install
 
-Copy the official `3Dmol-min.js` build into `web/vendor/3Dmol-min.js`.
-The app defaults to local assets and does not load from CDN.
+cd into the `topview` dir and:
+
+```bash
+pip install .
+```
+
+If you need gtk support, make sure you have the necessary dependencies and:
+
+```bash
+pip install .[gtk]
+```
 
 ## Run
 
+Loading topology+structure:
+
 ```bash
-python -m topview.app
+topview file.parm7 file.rst7
 ```
 
-Or pass files directly:
+Parm7-only with a 2D depiction of a single residue (defaults to `LIG`):
 
 ```bash
-python -m topview.app /path/to/file.parm7 /path/to/file.rst7
-```
-
-Parm7-only with a 2D depiction of a residue (defaults to `LIG`):
-
-```bash
-python -m topview.app /path/to/file.parm7 --resname LIG
-```
-
-You can also run the package entrypoint:
-
-```bash
-python -m topview /path/to/file.parm7 /path/to/file.rst7
+topview file.parm7
 ```
 
 Enable debug logging to a file:
 
 ```bash
-python -m topview.app --log-file /path/to/topview.log
+topview file.parm7 --log-file /path/to/topview.log
 ```
 
-Note: Use a recent `rdkit` build compatible with your Python version.
 
 ## Notes
 
