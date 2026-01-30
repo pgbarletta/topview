@@ -732,30 +732,6 @@ def _build_dihedral_table(
     )
 
 
-def _find_improper_central(
-    serials: Sequence[int], adjacency: Dict[int, set[int]]
-) -> Optional[int]:
-    candidates: List[int] = []
-    for candidate in serials:
-        neighbors = adjacency.get(int(candidate), set())
-        if all(int(other) in neighbors for other in serials if other != candidate):
-            candidates.append(int(candidate))
-    return min(candidates) if candidates else None
-
-
-def _order_improper(central: int, serials: Sequence[int]) -> Tuple[int, int, int, int]:
-    others: List[int] = []
-    for value in serials:
-        if int(value) == int(central):
-            continue
-        others.append(int(value))
-    others.sort()
-    ordered = [int(central)] + others
-    while len(ordered) < 4:
-        ordered.append(int(central))
-    return (ordered[0], ordered[1], ordered[2], ordered[3])
-
-
 def _build_improper_table(
     sections: Dict[str, Parm7Section],
     atom_names: List[str],
@@ -782,23 +758,18 @@ def _build_improper_table(
         atom_serials = _pointer_to_serial(records[:, :4])
         param_index = np.abs(records[:, 4]).astype(int)
         for idx in range(atom_serials.shape[0]):
-            atom_i = int(atom_serials[idx, 0])
-            atom_j = int(atom_serials[idx, 1])
-            atom_k = int(atom_serials[idx, 2])
-            atom_l = int(atom_serials[idx, 3])
-            central = _find_improper_central(
-                (atom_i, atom_j, atom_k, atom_l), adjacency
-            )
-            if central is not None:
-                ordered = _order_improper(
-                    central, (atom_i, atom_j, atom_k, atom_l)
-                )
+            raw_l = int(records[idx, 3])
+            if raw_l < 0:
+                atom_i = int(atom_serials[idx, 0])
+                atom_j = int(atom_serials[idx, 1])
+                atom_k = int(atom_serials[idx, 2])
+                atom_l = int(atom_serials[idx, 3])
                 entries.append(
                     (
-                        ordered[0],
-                        ordered[1],
-                        ordered[2],
-                        ordered[3],
+                        atom_i,
+                        atom_j,
+                        atom_k,
+                        atom_l,
                         int(param_index[idx]),
                         term_idx,
                     )
