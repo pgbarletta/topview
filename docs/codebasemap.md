@@ -77,6 +77,7 @@
 
 `web/src/app.js`
 - Bootstraps UI, loads system, attaches event handlers.
+- Water/H toggle buttons update labels and re-apply style presets via `state.hideWater` / `state.hideHydrogen`.
 
 `web/src/selection.js`
 - Selection state machine for Atom/Bond/Angle/Dihedral/Improper/1-4/Non-bonded.
@@ -86,6 +87,7 @@
 - 3Dmol viewer management and highlighting.
 - Theme-aware highlight color/opacity (higher contrast in light/dark modes).
 - Improper label rendering and central-to-neighbor highlight lines.
+- Visibility filters for water and hydrogen; 3D models load with hydrogens kept.
 
 `web/src/system_info.js`
 - Renders Info tables with sortable headers (single-column sort; special `ijkl indices` sorting).
@@ -102,9 +104,11 @@
 
 `web/src/state.js`
 - UI state store (selection, caches, system info, sorting state).
+- Includes visibility flags (`hideWater`, `hideHydrogen`) for viewer filters.
 
 `web/index.html`
 - Layout: toolbar, status, viewer, selection panel, info panel, parm7 panel.
+- Toolbar includes toggle buttons for water and hydrogen visibility.
 - Mode tabs include Improper.
 
 `web/styles.css`
