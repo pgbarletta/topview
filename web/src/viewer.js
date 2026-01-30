@@ -1333,7 +1333,7 @@ export function renderModel(pdbB64, onAtomClick, onEmptyClick) {
   }
   const pdb = decodeBase64(pdbB64);
   state.viewer.clear();
-  state.model = state.viewer.addModel(pdb, "pdb");
+  state.model = state.viewer.addModel(pdb, "pdb", { keepH: true });
   state.model.setClickable({}, true, function (atom) {
     if (!atom || !atom.serial) {
       return;
