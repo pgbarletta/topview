@@ -559,12 +559,14 @@ export function applyBaseStyle() {
   if (state.currentStyleKey === "cartoon_ligand") {
     state.viewer.setStyle({ protein: true }, STYLE_PRESETS.cartoon_ligand.protein);
     state.viewer.setStyle({ not: { protein: true } }, STYLE_PRESETS.cartoon_ligand.other);
+    applyVisibilityFilters();
     return;
   }
   if (!state.baseStyle) {
     state.baseStyle = STYLE_PRESETS.sticks;
   }
   state.viewer.setStyle({}, state.baseStyle);
+  applyVisibilityFilters();
 }
 
 /**
@@ -584,8 +586,32 @@ export function applyStylePreset(key, renderNow = true) {
     state.baseStyle = STYLE_PRESETS[key] || STYLE_PRESETS.sticks;
     state.viewer.setStyle({}, state.baseStyle);
   }
+  applyVisibilityFilters();
   if (renderNow) {
     requestRender();
+  }
+}
+
+function getWaterStyle() {
+  if (state.currentStyleKey === "cartoon_ligand") {
+    return STYLE_PRESETS.cartoon_ligand.other;
+  }
+  return state.baseStyle || STYLE_PRESETS.sticks;
+}
+
+export function applyVisibilityFilters() {
+  if (state.viewMode !== "3d" || !state.viewer) {
+    return;
+  }
+  const waterSelection = { resn: ["WAT", "HOH"] };
+  if (state.hideHydrogen) {
+    state.viewer.setStyle({ elem: "H" }, {});
+    if (!state.hideWater) {
+      state.viewer.setStyle(waterSelection, getWaterStyle());
+    }
+  }
+  if (state.hideWater) {
+    state.viewer.setStyle(waterSelection, {});
   }
 }
 

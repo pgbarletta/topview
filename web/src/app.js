@@ -261,6 +261,17 @@ function handleOpenDialog() {
     });
 }
 
+function updateVisibilityButtons() {
+  const waterBtn = document.getElementById("toggle-water");
+  if (waterBtn) {
+    waterBtn.textContent = state.hideWater ? "Show water" : "Hide water";
+  }
+  const hydrogenBtn = document.getElementById("toggle-hydrogen");
+  if (hydrogenBtn) {
+    hydrogenBtn.textContent = state.hideHydrogen ? "Show H (non-water)" : "Hide H (non-water)";
+  }
+}
+
 function attachEvents() {
   if (state.eventsAttached) {
     return;
@@ -269,6 +280,8 @@ function attachEvents() {
   const openBtn = document.getElementById("open-btn");
   const loadBtn = document.getElementById("load-btn");
   const clearBtn = document.getElementById("clear-btn");
+  const waterBtn = document.getElementById("toggle-water");
+  const hydrogenBtn = document.getElementById("toggle-hydrogen");
   const filterBtn = document.getElementById("filter-btn");
   const aboutBtn = document.getElementById("about-btn");
   const themeBtn = document.getElementById("theme-btn");
@@ -278,6 +291,22 @@ function attachEvents() {
   if (openBtn) openBtn.addEventListener("click", handleOpenDialog);
   if (loadBtn) loadBtn.addEventListener("click", loadFromInputs);
   if (clearBtn) clearBtn.addEventListener("click", clearSelection);
+  if (waterBtn) {
+    waterBtn.addEventListener("click", () => {
+      state.hideWater = !state.hideWater;
+      updateVisibilityButtons();
+      const styleSelect = document.getElementById("style-select");
+      applyStylePreset(styleSelect ? styleSelect.value : state.currentStyleKey);
+    });
+  }
+  if (hydrogenBtn) {
+    hydrogenBtn.addEventListener("click", () => {
+      state.hideHydrogen = !state.hideHydrogen;
+      updateVisibilityButtons();
+      const styleSelect = document.getElementById("style-select");
+      applyStylePreset(styleSelect ? styleSelect.value : state.currentStyleKey);
+    });
+  }
   if (filterBtn) filterBtn.addEventListener("click", runFilter);
   if (aboutBtn) aboutBtn.addEventListener("click", () => {
     toggleAboutPanel();
@@ -299,6 +328,7 @@ function attachEvents() {
       updateInfoFontSize(event.target.value);
     });
   }
+  updateVisibilityButtons();
 }
 
 window.addEventListener("pywebviewready", async function () {
