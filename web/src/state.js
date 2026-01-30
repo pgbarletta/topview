@@ -43,6 +43,8 @@ export const state = {
   selectionNonce: 0,
   selectionSerials: [],
   selectionMode: DEFAULT_SELECTION_MODE,
+  hideWater: false,
+  hideHydrogen: false,
   atomBySerial: new Map(),
   atomIndexBySerial: new Map(),
   atomByIndex: new Map(),
