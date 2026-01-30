@@ -252,14 +252,8 @@ def _accumulate_dihedral_records(
         serial_k = _pointer_to_serial(raw_k)
         serial_l = _pointer_to_serial(raw_l)
         dihedrals_by_idx[term_idx] = (serial_i, serial_j, serial_k, serial_l)
-        if impropers_by_idx is not None and adjacency:
-            central = _find_improper_central(
-                (serial_i, serial_j, serial_k, serial_l), adjacency
-            )
-            if central is not None:
-                impropers_by_idx[term_idx] = _order_improper(
-                    central, (serial_i, serial_j, serial_k, serial_l)
-                )
+        if impropers_by_idx is not None and raw_l < 0:
+            impropers_by_idx[term_idx] = (serial_i, serial_j, serial_k, serial_l)
         term_idx += 1
         if raw_k < 0 or raw_l < 0:
             continue

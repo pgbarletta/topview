@@ -112,7 +112,6 @@ export function attachSystemInfoTabs() {
     button.textContent = tab.label;
     button.addEventListener("click", () => {
       state.systemInfoTab = tab.id;
-      state.systemInfoSort = null;
       renderSystemInfo();
     });
     tabs.appendChild(button);
@@ -201,7 +200,7 @@ export function resetSystemInfoState() {
   state.systemInfoVisible = true;
   state.systemInfoTab = DEFAULT_SELECTION_MODE;
   state.systemInfoRowCursor = new Map();
-  state.systemInfoSort = null;
+  state.systemInfoSortByTable = new Map();
   const panel = document.getElementById("system-info-panel");
   if (panel) {
     panel.classList.remove("hidden");
@@ -349,9 +348,20 @@ function isSortableColumn(tableKey, column) {
   return allowed.includes(column);
 }
 
+function getTableSort(tableKey) {
+  if (!tableKey) {
+    return null;
+  }
+  const store = state.systemInfoSortByTable;
+  if (!store) {
+    return null;
+  }
+  return store.get(tableKey) || null;
+}
+
 function getSortState(tableKey, column) {
-  const sort = state.systemInfoSort;
-  if (!sort || sort.tableKey !== tableKey || sort.column !== column) {
+  const sort = getTableSort(tableKey);
+  if (!sort || sort.column !== column) {
     return null;
   }
   return sort.direction || null;
@@ -361,20 +371,27 @@ function toggleSort(tableKey, column) {
   if (!isSortableColumn(tableKey, column)) {
     return;
   }
-  const current = state.systemInfoSort;
+  const current = getTableSort(tableKey);
   let next = null;
-  if (current && current.tableKey === tableKey && current.column === column) {
+  if (current && current.column === column) {
     if (current.direction === "asc") {
-      next = { tableKey, column, direction: "desc" };
+      next = { column, direction: "desc" };
     } else if (current.direction === "desc") {
       next = null;
     } else {
-      next = { tableKey, column, direction: "asc" };
+      next = { column, direction: "asc" };
     }
   } else {
-    next = { tableKey, column, direction: "asc" };
+    next = { column, direction: "asc" };
   }
-  state.systemInfoSort = next;
+  if (!state.systemInfoSortByTable) {
+    state.systemInfoSortByTable = new Map();
+  }
+  if (next) {
+    state.systemInfoSortByTable.set(tableKey, next);
+  } else {
+    state.systemInfoSortByTable.delete(tableKey);
+  }
   renderSystemInfo();
 }
 
@@ -439,8 +456,8 @@ function compareIJKL(a, b) {
 }
 
 function applySort(tableKey, columns, rowsWithIndex) {
-  const sort = state.systemInfoSort;
-  if (!sort || sort.tableKey !== tableKey || !sort.column || !sort.direction) {
+  const sort = getTableSort(tableKey);
+  if (!sort || !sort.column || !sort.direction) {
     return rowsWithIndex;
   }
   if (!isSortableColumn(tableKey, sort.column)) {
@@ -561,9 +578,6 @@ export function updateSystemInfoHighlight(mode, interaction, atomInfo = null) {
   }
   const tabMatch = INFO_TABS.find((item) => item.id === mode);
   if (tabMatch) {
-    if (state.systemInfoTab !== tabMatch.id) {
-      state.systemInfoSort = null;
-    }
     state.systemInfoTab = tabMatch.id;
   }
   const setHighlight = (tab, match, colorMode) => {

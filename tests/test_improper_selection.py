@@ -38,11 +38,11 @@ def test_improper_selection_index():
             [0, 3, 1, 3, 6, 1, 3, 9, 1],
         ),
         "DIHEDRALS_INC_HYDROGEN": make_section(
-            "DIHEDRALS_INC_HYDROGEN", [0, 3, 6, 9, 1]
+            "DIHEDRALS_INC_HYDROGEN", [0, 3, 6, -9, 1]
         ),
     }
 
     selection_index = build_system_info_selection_index(sections)
 
     assert selection_index.dihedrals_by_idx[1] == (1, 2, 3, 4)
-    assert selection_index.impropers_by_idx[1] == (2, 1, 3, 4)
+    assert selection_index.impropers_by_idx[1] == (1, 2, 3, 4)

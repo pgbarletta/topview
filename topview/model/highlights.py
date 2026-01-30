@@ -643,11 +643,7 @@ class HighlightEngine:
     ) -> List[Dict[str, object]]:
         if len(serials) < 4:
             return []
-        central = self._infer_improper_central(serials)
-        if central is None:
-            return []
-        ordered = self._order_improper(central, serials[:4])
-        target_set = {int(value) for value in ordered}
+        target_set = {int(value) for value in serials[:4]}
         results: List[Dict[str, object]] = []
         for name in ("DIHEDRALS_INC_HYDROGEN", "DIHEDRALS_WITHOUT_HYDROGEN"):
             section = self._sections.get(name)
@@ -656,6 +652,8 @@ class HighlightEngine:
             values = self._get_int_section(name, section)
             for idx in range(0, len(values) - 4, 5):
                 raw_i, raw_j, raw_k, raw_l, raw_param = values[idx : idx + 5]
+                if raw_l >= 0:
+                    continue
                 atom_i = self._pointer_to_serial(raw_i)
                 atom_j = self._pointer_to_serial(raw_j)
                 atom_k = self._pointer_to_serial(raw_k)
@@ -663,12 +661,10 @@ class HighlightEngine:
                 record = [atom_i, atom_j, atom_k, atom_l]
                 if target_set != set(record):
                     continue
-                if not self._is_improper_record(central, record):
-                    continue
                 param_index = abs(raw_param)
                 results.append(
                     {
-                        "serials": ordered,
+                        "serials": record,
                         "param_index": param_index,
                         "force_constant": self._get_param_value(
                             "DIHEDRAL_FORCE_CONSTANT", param_index
@@ -1020,11 +1016,7 @@ class HighlightEngine:
     ) -> None:
         if len(serials) < 4:
             return
-        central = self._infer_improper_central(serials)
-        if central is None:
-            return
-        ordered = self._order_improper(central, serials[:4])
-        target_set = {int(value) for value in ordered}
+        target_set = {int(value) for value in serials[:4]}
         for name in ("DIHEDRALS_INC_HYDROGEN", "DIHEDRALS_WITHOUT_HYDROGEN"):
             section = self._sections.get(name)
             if not section or not section.tokens:
@@ -1032,14 +1024,14 @@ class HighlightEngine:
             values = self._get_int_section(name, section)
             for idx in range(0, len(values) - 4, 5):
                 raw_i, raw_j, raw_k, raw_l, raw_param = values[idx : idx + 5]
+                if raw_l >= 0:
+                    continue
                 atom_i = self._pointer_to_serial(raw_i)
                 atom_j = self._pointer_to_serial(raw_j)
                 atom_k = self._pointer_to_serial(raw_k)
                 atom_l = self._pointer_to_serial(raw_l)
                 record = [atom_i, atom_j, atom_k, atom_l]
                 if target_set != set(record):
-                    continue
-                if not self._is_improper_record(central, record):
                     continue
                 self._add_highlight(highlights, seen, section, idx)
                 self._add_highlight(highlights, seen, section, idx + 1)
