@@ -41,12 +41,12 @@
 - `Model.get_system_info()`: return system info tables (builds in background on load).
 - `Model.get_system_info_selection(table, row_index, cursor=0)`: selection for system info row.
 - `Model._get_system_info_selection_index()`: lazy build selection index.
-- `Model._get_bond_adjacency()`: lazy build bond adjacency for improper/rotatable logic.
+- `Model._get_bond_adjacency()`: lazy build bond adjacency for selection heuristics and bond-based checks.
 
 `topview/model/highlights.py`
 - `HighlightEngine`: compute parm7 highlights and interaction payloads.
 - Supports modes: Atom, Bond, Angle, Dihedral, Improper, 1-4 Nonbonded, Non-bonded.
-- Improper support: detects central-first improper selection and filters dihedral records by bonding adjacency.
+- Improper support: matches parm7 dihedral records where the raw L index is negative (no central-atom inference).
 
 `topview/model/state.py`
 - `ResidueMeta`, `AtomMeta`, `Parm7Token`, `Parm7Section` dataclasses.
@@ -61,11 +61,12 @@
 `topview/services/system_info.py`
 - `build_system_info_tables(...)`: build Info-panel tables from parm7 sections.
 - Tables: `atom_types`, `bond_types`, `angle_types`, `dihedral_types`, `improper_types`, `one_four_nonbonded`, `nonbonded_pairs`.
-- Dihedral table includes `amber_rotatable` (T/F) computed from `is_rotable.md` algorithm (heavy central bond, torsion presence, non-overlapping terminal neighbor sets).
+- Dihedral table includes `rotatable` (T/F) computed from `is_rotable.md` algorithm (heavy central bond, torsion presence, non-overlapping terminal neighbor sets).
+- Improper table includes dihedral records where the raw L index is negative (parm7 improper convention).
 
 `topview/services/system_info_selection.py`
 - `build_system_info_selection_index(...)`: build lookup tables for row-to-selection mapping.
-- Includes improper selection mapping (central-first ordering).
+- Improper selection mapping uses dihedral records where the raw L index is negative (parm7 improper convention).
 
 `topview/services/pdb_writer.py`
 - `write_pdb(atom_metas)`: build a PDB text block from atom metadata with stable serial ordering.
@@ -81,7 +82,7 @@
 
 `web/src/selection.js`
 - Selection state machine for Atom/Bond/Angle/Dihedral/Improper/1-4/Non-bonded.
-- Improper selection: central atom first, then 3 bonded neighbors.
+- Improper selection heuristic: treats the first selected atom as central if bonded to the other three.
 
 `web/src/viewer.js`
 - 3Dmol viewer management and highlighting.
@@ -91,6 +92,7 @@
 
 `web/src/system_info.js`
 - Renders Info tables with sortable headers (single-column sort; special `ijkl indices` sorting).
+- Sort state persists per-table across selections and tab switches.
 - Handles row selection and highlight matching.
 
 `web/src/parm7.js`
@@ -121,10 +123,13 @@
 - `test_pdb_writer_serials_order()`: verify PDB serial ordering.
 
 `tests/test_improper_selection.py`
-- Improper selection index ordering and mapping.
+- Improper selection index mapping using negative L dihedral entries.
 
 `tests/test_rotatable_dihedral.py`
 - Rotatable-bond detection and dihedral table column presence.
+
+`scripts/check_parm7_dihedrals.py`
+- CLI checker for parm7 dihedral records (5-int entries, improper if L index is negative).
 
 `README.md`
 - Usage documentation.

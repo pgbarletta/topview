@@ -94,5 +94,5 @@ def test_dihedral_table_has_rotatable_column():
         masses,
     )
 
-    assert "amber_rotatable" in table.columns
-    assert table.iloc[0]["amber_rotatable"] in ("T", "F")
+    assert "rotatable" in table.columns
+    assert table.iloc[0]["rotatable"] in ("T", "F")
