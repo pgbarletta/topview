@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import logging
 import os
 import time
+import warnings
 from typing import Callable, Dict, List, Optional, Tuple
 
 import MDAnalysis as mda
@@ -76,6 +77,22 @@ def _timed_call(fn: Callable[..., object], *args: object, **kwargs: object):
     start = time.perf_counter()
     result = fn(*args, **kwargs)
     return result, time.perf_counter() - start
+
+
+def _load_universe(parm7_path: str, rst7_path: str) -> mda.Universe:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Unknown ATOMIC_NUMBER value found for some atoms*",
+            category=UserWarning,
+            module=r"MDAnalysis\\.topology\\.TOPParser",
+        )
+        return mda.Universe(
+            parm7_path,
+            rst7_path,
+            format="RESTRT",
+            topology_format="PARM7",
+        )
 
 
 def _guess_element(atom_name: str) -> Optional[str]:
@@ -367,11 +384,9 @@ def load_system_data_3d(
     with ThreadPoolExecutor(max_workers=2) as executor:
         universe_future = executor.submit(
             _timed_call,
-            mda.Universe,
+            _load_universe,
             parm7_path,
             rst7_path,
-            format="RESTRT",
-            topology_format="PARM7",
         )
         parm7_future = executor.submit(_timed_call, parse_parm7, parm7_path)
         try:
@@ -416,15 +431,15 @@ def load_system_data_3d(
     masses = _safe_attr(universe.atoms, "masses")
     types = _safe_attr(universe.atoms, "types")
 
-    warnings: List[str] = []
+    warning_messages: List[str] = []
     if charges is None:
-        warnings.append("Atom charges not available in topology")
+        warning_messages.append("Atom charges not available in topology")
     if masses is None:
-        warnings.append("Atom masses not available in topology")
+        warning_messages.append("Atom masses not available in topology")
     if types is None:
-        warnings.append("Atom types not available in topology")
-    if warnings:
-        logger.debug("Topology warnings: %s", warnings)
+        warning_messages.append("Atom types not available in topology")
+    if warning_messages:
+        logger.debug("Topology warnings: %s", warning_messages)
     atom_type_indices, lj_by_type, lj_time = _compute_lj_tables(
         parm7_sections, natom, ntypes
     )
@@ -685,7 +700,7 @@ def load_system_data_2d(
             "Atom count mismatch: POINTERS NATOM=%d parmed=%d", natom, len(atoms)
         )
 
-    warnings: List[str] = []
+    warning_messages: List[str] = []
     charge_section = parm7_sections.get("CHARGE")
     charge_tokens = charge_section.tokens if charge_section else None
 
@@ -693,13 +708,13 @@ def load_system_data_2d(
     mass_missing = any(atom.mass is None for atom in atoms)
     type_missing = any(atom.type is None for atom in atoms)
     if charge_missing:
-        warnings.append("Atom charges not available in topology")
+        warning_messages.append("Atom charges not available in topology")
     if mass_missing:
-        warnings.append("Atom masses not available in topology")
+        warning_messages.append("Atom masses not available in topology")
     if type_missing:
-        warnings.append("Atom types not available in topology")
-    if warnings:
-        logger.debug("Topology warnings: %s", warnings)
+        warning_messages.append("Atom types not available in topology")
+    if warning_messages:
+        logger.debug("Topology warnings: %s", warning_messages)
 
     normalized_resname = (resname or DEFAULT_RESNAME).strip() or DEFAULT_RESNAME
     target_residue = None

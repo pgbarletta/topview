@@ -7,43 +7,6 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="toolbar">
-    <button id="open-btn" type="button">Open parm7 (rst7 optional)</button>
-    <div class="path-inputs">
-      <input id="parm7-path" type="text" placeholder="parm7 path" />
-      <input id="rst7-path" type="text" placeholder="rst7 path (optional)" />
-      <button id="load-btn" type="button">Load</button>
-    </div>
-    <label class="toolbar-group">
-      Style
-      <select id="style-select">
-        <option value="sticks">Sticks</option>
-        <option value="spheres">Spheres</option>
-        <option value="lines">Lines</option>
-        <option value="ballstick">Ball + Stick</option>
-        <option value="cartoon_ligand">Cartoon + Ligand</option>
-      </select>
-    </label>
-    <button id="clear-btn" type="button">Clear selection</button>
-    <button id="toggle-water" type="button">Hide water</button>
-    <button id="toggle-hydrogen" type="button">Hide H (non-water)</button>
-    <label class="toolbar-group">
-      Parm7 font (pt)
-      <input id="parm7-font-size" type="number" min="8" max="32" step="1" value="14" />
-    </label>
-    <label class="toolbar-group">
-      Info font (pt)
-      <input id="info-font-size" type="number" min="8" max="32" step="1" value="12" />
-    </label>
-    <button id="about-btn" type="button">About</button>
-    <button id="theme-btn" type="button">Dark mode</button>
-  </div>
-
-  <div id="status">
-    <span id="status-label">Idle</span>
-    <span id="status-detail"></span>
-  </div>
-
   <div id="content">
     <div id="viewer-panel">
       <div id="selection-panel">
@@ -73,6 +36,30 @@
       <div id="viewer-pane">
         <div class="pane-header">
           <h3>Viewer</h3>
+          <div class="viewer-actions">
+            <label class="viewer-style-select">
+              Style
+              <select id="viewer-style-select" aria-label="Viewer style">
+                <option value="sticks">Sticks</option>
+                <option value="ballstick">Ball+Stick</option>
+                <option value="spheres">Spheres</option>
+                <option value="lines">Lines</option>
+                <option value="cartoon">Cartoon</option>
+              </select>
+            </label>
+            <div class="viewer-visibility-buttons" role="group" aria-label="Visibility toggles">
+              <button id="toggle-water" type="button">Hide water</button>
+              <button id="toggle-hydrogen" type="button">Hide H (non-water)</button>
+            </div>
+            <div class="viewer-export-controls">
+              <select id="viewer-export-scale" aria-label="Export scale">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+              </select>
+              <button id="viewer-export-btn" type="button">Export</button>
+            </div>
+          </div>
         </div>
         <div id="viewer">
           <div id="viewer-3d"></div>
@@ -87,7 +74,11 @@
       <div id="system-info-panel">
         <div class="pane-header system-info-header">
           <h3>info</h3>
-          <button id="system-info-export" type="button">Export CSV</button>
+          <div class="info-actions">
+            <button id="about-btn" type="button">About</button>
+            <button id="theme-btn" type="button">Dark mode</button>
+            <button id="system-info-export" type="button">Export CSV</button>
+          </div>
         </div>
         <div id="system-info-tabs"></div>
         <div id="system-info-content">No system info loaded.</div>

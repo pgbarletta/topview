@@ -25,6 +25,7 @@
 - `Api.get_system_info(payload=None)`: return system info tables.
 - `Api.get_system_info_selection(payload)`: selection for system info table rows.
 - `Api.save_system_info_csv(payload)`: save CSV export.
+- `Api.save_viewer_image(payload)`: save PNG viewer export via file dialog.
 - `Api.select_files(payload=None)`: open parm7/rst7 file dialogs.
 - `Api.log_client_error(payload)`: log client-side errors to Python logs.
 
@@ -79,6 +80,7 @@
 `web/src/app.js`
 - Bootstraps UI, loads system, attaches event handlers.
 - Water/H toggle buttons update labels and re-apply style presets via `state.hideWater` / `state.hideHydrogen`.
+- Viewer actions: style dropdown and image export controls.
 
 `web/src/selection.js`
 - Selection state machine for Atom/Bond/Angle/Dihedral/Improper/1-4/Non-bonded.
@@ -89,6 +91,7 @@
 - Theme-aware highlight color/opacity (higher contrast in light/dark modes).
 - Improper label rendering and central-to-neighbor highlight lines.
 - Visibility filters for water and hydrogen; 3D models load with hydrogens kept.
+- `exportViewerImage(...)`: capture PNG data URI from 3Dmol and save PNG via pywebview.
 
 `web/src/system_info.js`
 - Renders Info tables with sortable headers (single-column sort; special `ijkl indices` sorting).
@@ -109,8 +112,9 @@
 - Includes visibility flags (`hideWater`, `hideHydrogen`) for viewer filters.
 
 `web/index.html`
-- Layout: toolbar, status, viewer, selection panel, info panel, parm7 panel.
-- Toolbar includes toggle buttons for water and hydrogen visibility.
+- Layout: selection panel, viewer panel, info panel, parm7 panel (no top toolbar).
+- Viewer header includes style buttons, water/H toggles, and export controls.
+- Info header hosts About/Theme buttons and CSV export.
 - Mode tabs include Improper.
 
 `web/styles.css`

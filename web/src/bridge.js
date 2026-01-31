@@ -99,6 +99,16 @@ export function saveSystemInfoCsv(csvText, name) {
 }
 
 /**
+ * @param {string} data
+ * @param {string} format
+ * @param {string} name
+ * @returns {Promise<any>}
+ */
+export function saveViewerImage(data, format, name) {
+  return callApi("save_viewer_image", { data: data, format: format, name: name });
+}
+
+/**
  * @param {number} serial
  * @returns {Promise<any>}
  */
