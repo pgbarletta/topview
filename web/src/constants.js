@@ -44,6 +44,7 @@ export const STYLE_PRESETS = {
   spheres: { sphere: { radius: 0.7 } },
   lines: { line: {} },
   ballstick: { stick: { radius: 0.2 }, sphere: { scale: 0.3 } },
+  cartoon: { cartoon: { color: "spectrum" } },
   cartoon_ligand: {
     protein: { cartoon: { color: "spectrum" } },
     other: { stick: { radius: 0.2 } },

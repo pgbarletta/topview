@@ -196,6 +196,7 @@ body.dark-mode {
   color: var(--muted);
 }
 
+
 #selection-body {
   padding: 12px;
   display: flex;
@@ -401,9 +402,64 @@ body.dark-mode {
   font-size: 12px;
 }
 
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.viewer-visibility-buttons,
+.viewer-export-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.viewer-visibility-buttons button,
+.viewer-export-controls button,
+.viewer-export-controls select {
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+  border-radius: 4px;
+}
+
+.viewer-style-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.viewer-style-select select {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.viewer-export-controls select {
+  background: var(--input-bg);
+}
+
+.info-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 #system-info-export {
   border: 1px solid var(--border);
   background: var(--button-bg);
+  color: var(--text);
   padding: 4px 8px;
   font-size: 11px;
   border-radius: 4px;

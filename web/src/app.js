@@ -8,7 +8,7 @@ import {
   queryAtoms,
   selectFiles,
 } from "./bridge.js";
-import { resetParm7State, renderParm7File, renderParm7Sections, updateParm7FontSize } from "./parm7.js";
+import { resetParm7State, renderParm7File, renderParm7Sections } from "./parm7.js";
 import { selectAtom, clearSelection } from "./selection.js";
 import { state } from "./state.js";
 import {
@@ -17,12 +17,12 @@ import {
   attachSystemInfoTabs,
   loadSystemInfo,
   resetSystemInfoState,
-  updateInfoFontSize,
 } from "./system_info.js";
 import {
   applyTheme,
   ensureViewer,
   applyStylePreset,
+  exportViewerImage,
   highlightSerials,
   renderModel,
   render2dModel,
@@ -108,10 +108,7 @@ async function loadSystem(parm7Path, rst7Path, resname) {
         return;
       }
       renderModel(result.pdb_b64, selectAtom, clearSelection);
-      const styleSelect = document.getElementById("style-select");
-      if (styleSelect) {
-        applyStylePreset(styleSelect.value, false);
-      }
+      applyViewerStylePreset(state.currentStyleKey, false);
       resizeViewer(true);
       const warn =
         result.warnings && result.warnings.length
@@ -272,6 +269,17 @@ function updateVisibilityButtons() {
   }
 }
 
+function applyViewerStylePreset(key, renderNow = true) {
+  if (!key) {
+    return;
+  }
+  applyStylePreset(key, renderNow);
+  const styleSelect = document.getElementById("viewer-style-select");
+  if (styleSelect && styleSelect.value !== key) {
+    styleSelect.value = key;
+  }
+}
+
 function attachEvents() {
   if (state.eventsAttached) {
     return;
@@ -285,9 +293,9 @@ function attachEvents() {
   const filterBtn = document.getElementById("filter-btn");
   const aboutBtn = document.getElementById("about-btn");
   const themeBtn = document.getElementById("theme-btn");
-  const styleSelect = document.getElementById("style-select");
-  const fontInput = document.getElementById("parm7-font-size");
-  const infoFontInput = document.getElementById("info-font-size");
+  const exportBtn = document.getElementById("viewer-export-btn");
+  const exportScale = document.getElementById("viewer-export-scale");
+  const styleSelect = document.getElementById("viewer-style-select");
   if (openBtn) openBtn.addEventListener("click", handleOpenDialog);
   if (loadBtn) loadBtn.addEventListener("click", loadFromInputs);
   if (clearBtn) clearBtn.addEventListener("click", clearSelection);
@@ -295,16 +303,14 @@ function attachEvents() {
     waterBtn.addEventListener("click", () => {
       state.hideWater = !state.hideWater;
       updateVisibilityButtons();
-      const styleSelect = document.getElementById("style-select");
-      applyStylePreset(styleSelect ? styleSelect.value : state.currentStyleKey);
+      applyViewerStylePreset(state.currentStyleKey);
     });
   }
   if (hydrogenBtn) {
     hydrogenBtn.addEventListener("click", () => {
       state.hideHydrogen = !state.hideHydrogen;
       updateVisibilityButtons();
-      const styleSelect = document.getElementById("style-select");
-      applyStylePreset(styleSelect ? styleSelect.value : state.currentStyleKey);
+      applyViewerStylePreset(state.currentStyleKey);
     });
   }
   if (filterBtn) filterBtn.addEventListener("click", runFilter);
@@ -315,17 +321,13 @@ function attachEvents() {
   if (themeBtn) themeBtn.addEventListener("click", () => applyTheme(!state.darkMode));
   if (styleSelect) {
     styleSelect.addEventListener("change", (event) => {
-      applyStylePreset(event.target.value);
+      applyViewerStylePreset(event.target.value);
     });
   }
-  if (fontInput) {
-    fontInput.addEventListener("input", (event) => {
-      updateParm7FontSize(event.target.value);
-    });
-  }
-  if (infoFontInput) {
-    infoFontInput.addEventListener("input", (event) => {
-      updateInfoFontSize(event.target.value);
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      const scale = exportScale && exportScale.value ? Number(exportScale.value) : 1;
+      exportViewerImage(scale);
     });
   }
   updateVisibilityButtons();
@@ -387,14 +389,6 @@ window.addEventListener("DOMContentLoaded", function () {
         pywebviewWarningTimer = null;
       }, 1500);
     }
-  }
-  const fontInput = document.getElementById("parm7-font-size");
-  if (fontInput) {
-    updateParm7FontSize(fontInput.value);
-  }
-  const infoFontInput = document.getElementById("info-font-size");
-  if (infoFontInput) {
-    updateInfoFontSize(infoFontInput.value);
   }
   applyTheme(state.darkMode);
   setSelectionMode("Atom");

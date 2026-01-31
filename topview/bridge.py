@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 from typing import Dict, Optional
 
@@ -435,8 +436,13 @@ class Api:
             name = f"{name}.csv"
         try:
             logger.debug("save_system_info_csv requested")
+            dialog = (
+                webview.FileDialog.SAVE
+                if hasattr(webview, "FileDialog")
+                else webview.SAVE_DIALOG
+            )
             selection = self._window.create_file_dialog(
-                webview.SAVE_DIALOG,
+                dialog,
                 save_filename=name,
                 file_types=("CSV (*.csv)", "All files (*.*)"),
             )
@@ -449,6 +455,64 @@ class Api:
         except Exception as exc:
             logger.exception("save_system_info_csv failed")
             return error_result("save_failed", "Failed to save CSV", str(exc))
+
+    def save_viewer_image(self, payload: Dict[str, object]):
+        """Save a viewer export payload to disk via a save dialog.
+
+        Parameters
+        ----------
+        payload
+            Payload containing image data, format, and optional name.
+
+        Returns
+        -------
+        dict
+            Save response payload.
+        """
+
+        if not self._window:
+            return error_result("no_window", "Window is not available")
+        if not isinstance(payload, dict):
+            return error_result("invalid_input", "payload must be an object")
+        data = payload.get("data")
+        fmt = str(payload.get("format") or "png").lower()
+        if fmt != "png":
+            return error_result("invalid_input", "format must be png")
+        name = payload.get("name") or f"topview-viewer.{fmt}"
+        if not isinstance(name, str):
+            name = str(name)
+        if not name.lower().endswith(f".{fmt}"):
+            name = f"{name}.{fmt}"
+        file_types = ("PNG (*.png)", "All files (*.*)")
+        if data is None:
+            return error_result("invalid_input", "data is required")
+        try:
+            dialog = (
+                webview.FileDialog.SAVE
+                if hasattr(webview, "FileDialog")
+                else webview.SAVE_DIALOG
+            )
+            selection = self._window.create_file_dialog(
+                dialog,
+                save_filename=name,
+                file_types=file_types,
+            )
+            if not selection:
+                return error_result("cancelled", "Save cancelled")
+            path = selection[0] if isinstance(selection, (list, tuple)) else selection
+            raw = data if isinstance(data, str) else str(data)
+            if raw.startswith("data:"):
+                raw = raw.split(",", 1)[1]
+            try:
+                binary = base64.b64decode(raw)
+            except Exception as exc:
+                return error_result("invalid_input", "Invalid PNG data", str(exc))
+            with open(path, "wb") as handle:
+                handle.write(binary)
+            return {"ok": True, "path": path}
+        except Exception as exc:
+            logger.exception("save_viewer_image failed")
+            return error_result("save_failed", "Failed to save image", str(exc))
 
     def get_parm7_highlights(self, payload: Dict[str, object]):
         """Return parm7 highlight spans.

@@ -4,6 +4,7 @@ import {
   HIGHLIGHT_LINE_OPACITY,
   STYLE_PRESETS,
 } from "./constants.js";
+import { hasApiMethod, saveViewerImage } from "./bridge.js";
 import { state } from "./state.js";
 import { decodeBase64, formatNumber, midpoint, centroid } from "./utils.js";
 import { setStatus } from "./ui.js";
@@ -612,6 +613,81 @@ export function applyVisibilityFilters() {
   }
   if (state.hideWater) {
     state.viewer.setStyle(waterSelection, {});
+  }
+}
+
+async function scalePngDataUri(dataUri, scale) {
+  if (!dataUri || !scale || scale === 1) {
+    return { dataUri, width: null, height: null };
+  }
+  const image = new Image();
+  image.src = dataUri;
+  await image.decode();
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return { dataUri, width: null, height: null };
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, 0, 0, width, height);
+  return { dataUri: canvas.toDataURL("image/png"), width, height };
+}
+
+export async function exportViewerImage(scale = 1) {
+  if (!hasApiMethod("save_viewer_image")) {
+    setStatus("error", "Image export is not available");
+    return;
+  }
+  if (state.viewMode !== "3d" || !state.viewer) {
+    setStatus("error", "3D viewer is not available");
+    return;
+  }
+  if (typeof state.viewer.pngURI !== "function") {
+    setStatus("error", "Viewer export is not supported");
+    return;
+  }
+  const canvas = typeof state.viewer.getCanvas === "function" ? state.viewer.getCanvas() : null;
+  const baseWidth = canvas ? canvas.width : null;
+  const baseHeight = canvas ? canvas.height : null;
+  let pngUri = state.viewer.pngURI();
+  if (!pngUri) {
+    setStatus("error", "Failed to capture viewer image");
+    return;
+  }
+  let exportWidth = baseWidth;
+  let exportHeight = baseHeight;
+  if (scale && Number.isFinite(scale) && scale > 1) {
+    try {
+      const scaled = await scalePngDataUri(pngUri, scale);
+      pngUri = scaled.dataUri;
+      exportWidth = scaled.width || exportWidth;
+      exportHeight = scaled.height || exportHeight;
+    } catch (err) {
+      console.warn("Failed to scale export image", err);
+    }
+  }
+  const name = "topview-viewer.png";
+  try {
+    const base64 = pngUri.includes(",") ? pngUri.split(",")[1] : pngUri;
+    const result = await saveViewerImage(base64, "png", name);
+    if (!result || !result.ok) {
+      const err = result && result.error ? result.error : null;
+      if (err && err.code === "cancelled") {
+        setStatus("info", "Export cancelled");
+        return;
+      }
+      const msg = err ? err.message : "Export failed";
+      setStatus("error", msg);
+      return;
+    }
+    setStatus("success", `Saved ${result.path}`);
+  } catch (err) {
+    setStatus("error", String(err));
   }
 }
 
