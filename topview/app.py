@@ -113,7 +113,11 @@ def main() -> None:
         info_font_size=args.info_font_size,
         initial_resname=args.resname,
     )
-    gui = os.environ.get("PYWEBVIEW_GUI", "qt")
+    gui = os.environ.get("PYWEBVIEW_GUI") or None
+    if gui:
+        logger.debug("Using pywebview GUI backend: %s", gui)
+    else:
+        logger.debug("Using pywebview GUI backend: auto")
     webview.start(debug=False, gui=gui)
 
 

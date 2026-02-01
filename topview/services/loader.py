@@ -432,6 +432,7 @@ def load_system_data_3d(
     types = _safe_attr(universe.atoms, "types")
 
     warning_messages: List[str] = []
+    warnings: List[str] = []
     if charges is None:
         warning_messages.append("Atom charges not available in topology")
     if masses is None:
@@ -440,6 +441,7 @@ def load_system_data_3d(
         warning_messages.append("Atom types not available in topology")
     if warning_messages:
         logger.debug("Topology warnings: %s", warning_messages)
+        warnings.extend(warning_messages)
     atom_type_indices, lj_by_type, lj_time = _compute_lj_tables(
         parm7_sections, natom, ntypes
     )
@@ -701,6 +703,7 @@ def load_system_data_2d(
         )
 
     warning_messages: List[str] = []
+    warnings: List[str] = []
     charge_section = parm7_sections.get("CHARGE")
     charge_tokens = charge_section.tokens if charge_section else None
 
@@ -715,6 +718,7 @@ def load_system_data_2d(
         warning_messages.append("Atom types not available in topology")
     if warning_messages:
         logger.debug("Topology warnings: %s", warning_messages)
+        warnings.extend(warning_messages)
 
     normalized_resname = (resname or DEFAULT_RESNAME).strip() or DEFAULT_RESNAME
     target_residue = None
