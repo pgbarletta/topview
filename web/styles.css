@@ -456,7 +456,7 @@ body.dark-mode {
   gap: 6px;
 }
 
-#system-info-export {
+.info-actions button {
   border: 1px solid var(--border);
   background: var(--button-bg);
   color: var(--text);
