@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import mmap
 import re
 from pathlib import Path
@@ -11,6 +12,8 @@ import numpy as np
 
 from topview.config import PARM7_REFERENCE_PATH, PARM7_TOKEN_SECTIONS
 from topview.model.state import Parm7Section, Parm7Token
+
+logger = logging.getLogger(__name__)
 
 _PARM7_DESCRIPTIONS: Optional[Dict[str, str]] = None
 _PARM7_DEPRECATED: Optional[set] = None
@@ -129,6 +132,25 @@ def parse_parm7(path: str) -> Tuple[str, Dict[str, Parm7Section]]:
     if current_name is not None:
         finalize_section(len(lines) - 1)
     return text, sections
+
+
+def describe_section(section: Optional[Parm7Section]) -> str:
+    """Return a short description of a parm7 section for logging."""
+
+    if not section:
+        return "section=missing"
+    token_count = len(section.tokens or [])
+    if token_count:
+        first_token_line = section.tokens[0].line + 1
+        last_token_line = section.tokens[-1].line + 1
+        token_line_range = f"{first_token_line}-{last_token_line}"
+    else:
+        token_line_range = "n/a"
+    return (
+        f"section={section.name} lines={section.flag_line + 1}-{section.end_line + 1} "
+        f"format={section.count}x{section.width} tokens={token_count} "
+        f"token_lines={token_line_range}"
+    )
 
 
 def load_parm7_descriptions() -> Dict[str, str]:
@@ -259,6 +281,11 @@ def parse_pointers(section: Parm7Section) -> Dict[str, int]:
     raw = " ".join(token.value for token in section.tokens)
     values = np.fromstring(raw, sep=" ", dtype=int)
     if values.size not in (31, 32):
+        logger.error(
+            "POINTERS length mismatch: parsed=%d expected=31 or 32; %s",
+            values.size,
+            describe_section(section),
+        )
         raise ValueError(
             f"POINTERS section length {values.size} does not match expected 31 or 32 values"
         )
