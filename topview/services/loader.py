@@ -18,7 +18,7 @@ from topview.config import CHARGE_SCALE, DEFAULT_RESNAME
 from topview.errors import ModelError
 from topview.model.state import AtomMeta, Parm7Section, ResidueMeta
 from topview.services.lj import compute_lj_tables
-from topview.services.parm7 import parse_parm7, parse_pointers
+from topview.services.parm7 import describe_section, parse_parm7, parse_pointers
 from topview.services.pdb_writer import write_pdb
 
 logger = logging.getLogger(__name__)
@@ -185,6 +185,40 @@ def _compute_lj_tables(
                 ntypes=ntypes,
             )
         except ValueError as exc:
+            expected_nonbond = ntypes * ntypes
+            expected_coef = ntypes * (ntypes + 1) // 2
+            logger.error("Failed to parse LJ tables: %s", exc)
+            logger.error(
+                "LJ context: natom=%d ntypes=%d expected_nonbond=%d expected_coef=%d",
+                natom,
+                ntypes,
+                expected_nonbond,
+                expected_coef,
+            )
+            logger.error(
+                "LJ section ATOM_TYPE_INDEX expected=%d actual=%d; %s",
+                natom,
+                len(atom_type_values),
+                describe_section(atom_type_index_section),
+            )
+            logger.error(
+                "LJ section NONBONDED_PARM_INDEX expected=%d actual=%d; %s",
+                expected_nonbond,
+                len(nonbond_values),
+                describe_section(nonbond_index_section),
+            )
+            logger.error(
+                "LJ section LENNARD_JONES_ACOEF expected=%d actual=%d; %s",
+                expected_coef,
+                len(acoef_values),
+                describe_section(acoef_section),
+            )
+            logger.error(
+                "LJ section LENNARD_JONES_BCOEF expected=%d actual=%d; %s",
+                expected_coef,
+                len(bcoef_values),
+                describe_section(bcoef_section),
+            )
             raise ModelError(
                 "parm7_parse_failed", "Failed to parse LJ tables", str(exc)
             ) from exc

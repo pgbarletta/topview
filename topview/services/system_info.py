@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -10,7 +11,9 @@ import numpy as np
 import pandas as pd
 
 from topview.model.state import Parm7Section
-from topview.services.parm7 import parse_pointers
+from topview.services.parm7 import describe_section, parse_pointers
+
+logger = logging.getLogger(__name__)
 
 LJ_MIN_COEF = 1.0e-10
 
@@ -205,6 +208,7 @@ def build_system_info_tables_with_timing(
 def _pointer_value(pointers: Dict[str, int], name: str) -> int:
     value = int(pointers.get(name, 0))
     if value < 0:
+        logger.error("POINTERS %s value is negative: %d", name, value)
         raise ValueError(f"POINTERS {name} value {value} is negative")
     return value
 
@@ -215,20 +219,47 @@ def _parse_int_section(
     if expected == 0:
         section = sections.get(name)
         if section and section.tokens:
+            logger.error(
+                "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+                name,
+                expected,
+                len(section.tokens),
+                describe_section(section),
+            )
             raise ValueError(
                 f"{name} length {len(section.tokens)} does not match expected {expected}"
             )
         return np.zeros(0, dtype=int)
     section = sections.get(name)
     if not section or not section.tokens:
+        logger.error(
+            "Parm7 section missing: %s expected=%d; %s",
+            name,
+            expected,
+            describe_section(section),
+        )
         raise ValueError(f"{name} section missing")
     if len(section.tokens) != expected:
+        logger.error(
+            "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+            name,
+            expected,
+            len(section.tokens),
+            describe_section(section),
+        )
         raise ValueError(
             f"{name} length {len(section.tokens)} does not match expected {expected}"
         )
     raw = " ".join(token.value for token in section.tokens)
     values = np.fromstring(raw, sep=" ", dtype=int)
     if values.size != expected:
+        logger.error(
+            "Parm7 section %s parsed value mismatch: parsed=%d expected=%d; %s",
+            name,
+            values.size,
+            expected,
+            describe_section(section),
+        )
         raise ValueError(
             f"{name} parsed {values.size} values but expected {expected}"
         )
@@ -241,14 +272,34 @@ def _parse_float_section(
     if expected == 0:
         section = sections.get(name)
         if section and section.tokens:
+            logger.error(
+                "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+                name,
+                expected,
+                len(section.tokens),
+                describe_section(section),
+            )
             raise ValueError(
                 f"{name} length {len(section.tokens)} does not match expected {expected}"
             )
         return np.zeros(0, dtype=float)
     section = sections.get(name)
     if not section or not section.tokens:
+        logger.error(
+            "Parm7 section missing: %s expected=%d; %s",
+            name,
+            expected,
+            describe_section(section),
+        )
         raise ValueError(f"{name} section missing")
     if len(section.tokens) != expected:
+        logger.error(
+            "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+            name,
+            expected,
+            len(section.tokens),
+            describe_section(section),
+        )
         raise ValueError(
             f"{name} length {len(section.tokens)} does not match expected {expected}"
         )
@@ -256,6 +307,13 @@ def _parse_float_section(
     raw = raw.replace("D", "E").replace("d", "e")
     values = np.fromstring(raw, sep=" ", dtype=float)
     if values.size != expected:
+        logger.error(
+            "Parm7 section %s parsed value mismatch: parsed=%d expected=%d; %s",
+            name,
+            values.size,
+            expected,
+            describe_section(section),
+        )
         raise ValueError(
             f"{name} parsed {values.size} values but expected {expected}"
         )
@@ -268,14 +326,34 @@ def _parse_string_section(
     if expected == 0:
         section = sections.get(name)
         if section and section.tokens:
+            logger.error(
+                "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+                name,
+                expected,
+                len(section.tokens),
+                describe_section(section),
+            )
             raise ValueError(
                 f"{name} length {len(section.tokens)} does not match expected {expected}"
             )
         return []
     section = sections.get(name)
     if not section or not section.tokens:
+        logger.error(
+            "Parm7 section missing: %s expected=%d; %s",
+            name,
+            expected,
+            describe_section(section),
+        )
         raise ValueError(f"{name} section missing")
     if len(section.tokens) != expected:
+        logger.error(
+            "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+            name,
+            expected,
+            len(section.tokens),
+            describe_section(section),
+        )
         raise ValueError(
             f"{name} length {len(section.tokens)} does not match expected {expected}"
         )
