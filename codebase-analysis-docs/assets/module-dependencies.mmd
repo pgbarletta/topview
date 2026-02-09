@@ -1,0 +1,61 @@
+flowchart TD
+  subgraph Python
+    App[topview/app.py]
+    Bridge[topview/bridge.py]
+    Model[topview/model/model.py]
+    Highlight[topview/model/highlights.py]
+    Query[topview/model/query.py]
+    State[topview/model/state.py]
+    Loader[topview/services/loader.py]
+    Parm7[topview/services/parm7.py]
+    LJ[topview/services/lj.py]
+    SysInfo[topview/services/system_info.py]
+    SysSel[topview/services/system_info_selection.py]
+    PDB[topview/services/pdb_writer.py]
+    Worker[topview/worker.py]
+  end
+
+  App --> Bridge
+  App --> Model
+  App --> Worker
+  Bridge --> Model
+  Bridge --> Worker
+  Model --> Highlight
+  Model --> Query
+  Model --> State
+  Model --> Loader
+  Model --> Parm7
+  Model --> SysInfo
+  Model --> SysSel
+  Highlight --> State
+  Highlight --> Parm7
+  Loader --> State
+  Loader --> LJ
+  Loader --> Parm7
+  Loader --> PDB
+  SysInfo --> Parm7
+  SysSel --> Parm7
+
+  subgraph Web
+    JsApp[web/src/app.js]
+    JsBridge[web/src/bridge.js]
+    Viewer[web/src/viewer.js]
+    Selection[web/src/selection.js]
+    ParmPanel[web/src/parm7.js]
+    InfoPanel[web/src/system_info.js]
+    UI[web/src/ui.js]
+    SharedState[web/src/state.js]
+  end
+
+  JsApp --> JsBridge
+  JsApp --> Viewer
+  JsApp --> Selection
+  JsApp --> ParmPanel
+  JsApp --> InfoPanel
+  Selection --> Viewer
+  Selection --> ParmPanel
+  Selection --> InfoPanel
+  Viewer --> SharedState
+  Selection --> SharedState
+  InfoPanel --> SharedState
+  UI --> SharedState

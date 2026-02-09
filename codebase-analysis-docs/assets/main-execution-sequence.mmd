@@ -1,0 +1,32 @@
+sequenceDiagram
+  participant User
+  participant CLI as topview/app.py
+  participant App as create_app
+  participant API as Api (bridge.py)
+  participant Worker
+  participant Model
+  participant Loader as services/loader.py
+  participant UI as web/src/app.js
+
+  User->>CLI: topview file.parm7 [file.rst7]
+  CLI->>App: create_app(initial_paths)
+  App->>API: construct Api(model, worker)
+  App->>UI: pywebview loads web/index.html
+  UI->>API: get_initial_paths()
+  UI->>API: load_system(parm7, rst7, resname)
+  API->>Worker: submit(Model.load_system)
+  Worker->>Model: load_system(...)
+  Model->>Loader: load_system_data(...)
+  Loader-->>Model: SystemLoadResult (3d: pdb_b64 | 2d: depiction)
+  Model-->>API: load payload (natoms, nresidues, warnings)
+  API-->>UI: {ok: true, view_mode, model payload}
+  UI->>API: get_parm7_text()
+  UI->>API: get_parm7_sections()
+  UI->>API: get_system_info()
+  API->>Model: corresponding getters
+  Model-->>UI: text/sections/tables
+
+  Note over UI,API: Selection path
+  UI->>API: get_atom_bundle(serial) / get_parm7_highlights(serials, mode)
+  API->>Model: get_atom_bundle/get_parm7_highlights
+  Model-->>UI: atom details + highlights + interaction
