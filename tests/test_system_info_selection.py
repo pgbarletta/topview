@@ -2,7 +2,7 @@ from pathlib import Path
 
 from topview.model import Model
 from topview.model.state import Parm7Section, Parm7Token
-from topview.services.parm7 import POINTER_NAMES
+from topview.services.parm7 import OPTIONAL_PRMTOP_SECTIONS, POINTER_NAMES
 from topview.services.system_info_selection import (
     build_system_info_selection_index,
     nonbonded_pair_for_cursor,
@@ -101,7 +101,6 @@ def test_system_info_selection_integration() -> None:
     columns = table["columns"]
     rows = table["rows"]
     assert rows
-    type_index_idx = columns.index("type_index")
     count_idx = columns.index("atom_count")
     row_index = None
     type_index = None
@@ -118,3 +117,62 @@ def test_system_info_selection_integration() -> None:
     atom_info = model.get_atom_info(serial)
     assert atom_info["ok"]
     assert atom_info["atom"]["parm7"]["atom_type_index"] == type_index
+
+
+def test_system_info_selection_integration_without_optional_sections() -> None:
+    root = Path(__file__).resolve().parents[1]
+    parm7_path = root / "tests" / "data" / "wcn.parm7"
+    rst7_path = root / "tests" / "data" / "wcnref.rst7"
+    assert parm7_path.exists()
+    assert rst7_path.exists()
+
+    model = Model()
+    result = model.load_system(str(parm7_path), str(rst7_path))
+    assert result["ok"]
+
+    with model._lock:
+        sections = dict(model._state.parm7_sections)
+        for name in OPTIONAL_PRMTOP_SECTIONS:
+            sections.pop(name, None)
+        model._state.parm7_sections = sections
+        model._state.system_info = None
+        model._state.system_info_future = None
+        model._state.system_info_selection_index = None
+        model._state.system_info_selection_future = None
+        natom = len(model._state.meta_list)
+
+    info = model.get_system_info()
+    assert info["ok"]
+
+    table = info["tables"]["atom_types"]
+    columns = table["columns"]
+    rows = table["rows"]
+    assert rows
+    type_index_idx = columns.index("type_index")
+    count_idx = columns.index("atom_count")
+    row_index = None
+    for idx, row in enumerate(rows):
+        count = row[count_idx]
+        if count and int(count) > 0:
+            row_index = idx
+            break
+    assert row_index is not None
+
+    selection = model.get_system_info_selection("atom_types", row_index, 0)
+    assert selection["ok"]
+    serial = int(selection["serials"][0])
+    assert 1 <= serial <= natom
+    atom_info = model.get_atom_info(serial)
+    assert atom_info["ok"]
+
+    dihedral_table = info["tables"]["dihedral_types"]
+    if dihedral_table["rows"]:
+        dihedral_selection = model.get_system_info_selection("dihedral_types", 0, 0)
+        assert dihedral_selection["ok"]
+        highlight = model.get_parm7_highlights(dihedral_selection["serials"], "Dihedral")
+        assert highlight["ok"]
+        interaction = highlight.get("interaction") or {}
+        dihedrals = interaction.get("dihedrals") or []
+        if dihedrals:
+            assert all(entry.get("scee") is None for entry in dihedrals)
+            assert all(entry.get("scnb") is None for entry in dihedrals)

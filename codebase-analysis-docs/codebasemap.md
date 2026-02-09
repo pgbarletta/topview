@@ -52,14 +52,14 @@
 Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 
 1. `P0` | `topview/model/highlights.py` | py | 1084 | `acd2a5b7` | Core selection/highlight semantics across all modes.
-2. `P0` | `topview/services/system_info.py` | py | 1221 | `c75175a5` | Builds all info tables and rotatable/improper rules.
+2. `P0` | `topview/services/system_info.py` | py | 1263 | `5294a8e8` | Builds all info tables and rotatable/improper rules.
 3. `P0` | `topview/services/loader.py` | py | 966 | `5ebe31cf` | Main data ingress (3D/2D), metadata, LJ, depiction.
 4. `P0` | `topview/model/model.py` | py | 729 | `e4edd6fb` | Central state manager and API-facing behavior.
 5. `P0` | `topview/bridge.py` | py | 619 | `0f692ed9` | Python-JS RPC boundary.
 6. `P0` | `web/src/viewer.js` | js | 1429 | `e26e5b8b` | 3D/2D rendering, highlighting, labeling, export.
 7. `P0` | `web/src/system_info.js` | js | 790 | `c52eb317` | Info panel rendering/sorting/selection bridging.
 8. `P0` | `topview/services/system_info_selection.py` | py | 329 | `9f0f32f9` | Row-to-selection mapping index.
-9. `P1` | `topview/services/parm7.py` | py | 459 | `9a3f4291` | Token parser + pointer decode + ref descriptions.
+9. `P1` | `topview/services/parm7.py` | py | 471 | `1605e6fd` | Token parser + pointer decode + ref descriptions.
 10. `P1` | `topview/services/lj.py` | py | 271 | `b1bec2d7` | LJ table math and validation.
 11. `P1` | `web/src/app.js` | js | 399 | `5f276ae3` | Frontend bootstrap/orchestration.
 12. `P1` | `web/src/selection.js` | js | 350 | `a4a7bea8` | Selection state machine.
@@ -79,7 +79,7 @@ Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 26. `P2` | `web/index.html` | html | 97 | `1794becf` | UI layout skeleton.
 27. `P2` | `web/styles.css` | css | 815 | `b630da3d` | UI styling/themes.
 28. `P2` | `scripts/check_parm7_dihedrals.py` | py | 278 | `82e18230` | External diagnostic script.
-29. `P3` | `tests/test_system_info_selection.py` | py | 120 | `979803ba` | Core row-selection correctness tests.
+29. `P3` | `tests/test_system_info_selection.py` | py | 179 | `67922872` | Core row-selection correctness tests.
 30. `P3` | `tests/test_rotatable_dihedral.py` | py | 98 | `c5202c5e` | Rotatable/dihedral table tests.
 31. `P3` | `tests/test_lj_parmed.py` | py | 53 | `2b32b193` | LJ parity with ParmEd.
 32. `P3` | `tests/test_improper_selection.py` | py | 48 | `8c9d0de6` | Improper sign convention test.
@@ -96,6 +96,7 @@ Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 43. `P3` | `topview/services/__init__.py` | py | 1 | `64dfd3ea` | services package marker.
 44. `P3` | `topview/cli/__init__.py` | py | 1 | `d27ff657` | cli package marker.
 45. `P3` | `web/vendor/3Dmol-min.js` | js(min) | 1 | `c24a17b2` | Third-party vendor bundle.
+46. `P3` | `tests/test_optional_prmtop_sections.py` | py | 68 | `d39358b3` | Optional parm7 section tolerance and strict malformed-present behavior tests.
 
 ### Initial Architecture Hypothesis
 - Backend is authoritative for topology parsing, selection semantics, and numeric table generation.
@@ -210,6 +211,7 @@ Core user workflows:
 
 ### Precision and Numeric Semantics
 - Fortran exponent support (`D`/`d`) is normalized to `E` in float parsing.
+- Missing optional `SCEE_SCALE_FACTOR`/`SCNB_SCALE_FACTOR` sections are represented as `NaN` in table construction and serialized as `None` for UI rendering.
 - Two related but distinct LJ distances appear:
   - per-type diagonal `rmin/2` in loader atom metadata (`*0.5` factor)
   - pairwise `rmin` in nonbonded tables/interactions (no `/2` factor)
@@ -295,6 +297,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Edge logic:
   - rotatable detection from heavy central bonds + terminal-neighbor disjointness
   - improper table only from records with negative raw L
+  - optional `SCEE_SCALE_FACTOR`/`SCNB_SCALE_FACTOR` are tolerated as missing (rendered `N/A`), but malformed-present sections still raise parse errors
 
 ### Capability 4: Row-to-Selection Mapping
 - Purpose: selecting a table row highlights specific atom tuples in viewer/parm7.
@@ -405,6 +408,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
   - improper selection sign convention.
   - rotatable-dihedral logic.
   - system-info row selection mapping.
+  - optional parm7 section handling (`SCEE/SCNB` missing tolerated, malformed-present still strict).
 - Current environment gap:
   - `pytest` not installed in this session (tests not executable here).
 
@@ -596,6 +600,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - Globals/Constants:
     - `POINTER_NAMES`
+    - `OPTIONAL_PRMTOP_SECTIONS`
     - `_PARM7_DESCRIPTIONS`, `_PARM7_DEPRECATED`
   - Functions:
     - `parse_parm7(path)`
@@ -660,12 +665,14 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - Globals/Constants:
     - `LJ_MIN_COEF`
+    - `OPTIONAL_CONSUMED_FLOAT_SECTIONS`
   - Functions:
     - `build_system_info_tables(sections)`
     - `build_system_info_tables_with_timing(sections)`
     - `_pointer_value(...)`
     - `_parse_int_section(...)`
     - `_parse_float_section(...)`
+    - `_parse_optional_float_section(...)`
     - `_parse_string_section(...)`
     - `_build_type_name_map(...)`
     - `_build_atom_type_table(...)`
@@ -680,6 +687,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - helper functions for parameter lookup and serialization.
   - Notes:
     - Rotatable detection uses heavy central bonds and non-overlapping terminal neighbor sets.
+    - Missing `SCEE_SCALE_FACTOR`/`SCNB_SCALE_FACTOR` is handled via `NaN` placeholders; malformed-present optional sections are still strict errors.
 
 ## `topview/services/system_info_selection.py`
 - Role: precomputes row-selection lookup indexes.
@@ -949,6 +957,16 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `test_nonbonded_pair_indexing_cross_type()`
     - `test_nonbonded_pair_indexing_same_type()`
     - `test_system_info_selection_integration()`
+    - `test_system_info_selection_integration_without_optional_sections()`
+
+## `tests/test_optional_prmtop_sections.py`
+- Role: validates optional parm7 section policy for system-info table construction.
+- Defines:
+  - Functions:
+    - `_load_fixture_sections()`
+    - `test_system_info_build_succeeds_without_scee_and_scnb()`
+    - `test_system_info_build_succeeds_without_unconsumed_optional_sections()`
+    - `test_malformed_optional_section_still_errors_when_present()`
 
 ### Project Metadata
 
@@ -1015,4 +1033,3 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 ### Final Notes
 - All major claims above are tied to concrete files and symbols.
 - Diagram artifacts are saved under `codebase-analysis-docs/assets/`.
-
