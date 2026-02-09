@@ -53,6 +53,18 @@ POINTER_NAMES = [
     "NCOPY",
 ]
 
+OPTIONAL_PRMTOP_SECTIONS = frozenset(
+    {
+        "ATOMIC_NUMBER",
+        "SCEE_SCALE_FACTOR",
+        "SCNB_SCALE_FACTOR",
+        "SOLVENT_POINTERS",
+        "ATOMS_PER_MOLECULE",
+        "BOX_DIMENSIONS",
+        "RADIUS_SET",
+    }
+)
+
 
 def parse_parm7(path: str) -> Tuple[str, Dict[str, Parm7Section]]:
     """Parse a parm7 file into raw text and tokenized sections.

@@ -16,6 +16,9 @@ from topview.services.parm7 import describe_section, parse_pointers
 logger = logging.getLogger(__name__)
 
 LJ_MIN_COEF = 1.0e-10
+OPTIONAL_CONSUMED_FLOAT_SECTIONS = frozenset(
+    {"SCEE_SCALE_FACTOR", "SCNB_SCALE_FACTOR"}
+)
 
 
 def build_system_info_tables(
@@ -89,8 +92,12 @@ def build_system_info_tables(
         sections, "DIHEDRAL_PERIODICITY", nptra
     )
     dihedral_phase = _parse_float_section(sections, "DIHEDRAL_PHASE", nptra)
-    scee_scale = _parse_float_section(sections, "SCEE_SCALE_FACTOR", nptra)
-    scnb_scale = _parse_float_section(sections, "SCNB_SCALE_FACTOR", nptra)
+    scee_scale = _parse_optional_float_section(
+        sections, "SCEE_SCALE_FACTOR", nptra
+    )
+    scnb_scale = _parse_optional_float_section(
+        sections, "SCNB_SCALE_FACTOR", nptra
+    )
 
     type_name_map = _build_type_name_map(atom_type_indices, amber_atom_types, ntypes)
     atom_types_df = _build_atom_type_table(
@@ -318,6 +325,41 @@ def _parse_float_section(
             f"{name} parsed {values.size} values but expected {expected}"
         )
     return values
+
+
+def _parse_optional_float_section(
+    sections: Dict[str, Parm7Section],
+    name: str,
+    expected: int,
+    fill_value: float = np.nan,
+) -> np.ndarray:
+    section = sections.get(name)
+    if section is None:
+        if expected <= 0:
+            return np.zeros(0, dtype=float)
+        return np.full(expected, fill_value, dtype=float)
+    if expected == 0:
+        if section.tokens:
+            logger.error(
+                "Parm7 section %s length mismatch: expected=%d actual=%d; %s",
+                name,
+                expected,
+                len(section.tokens),
+                describe_section(section),
+            )
+            raise ValueError(
+                f"{name} length {len(section.tokens)} does not match expected {expected}"
+            )
+        return np.zeros(0, dtype=float)
+    if not section.tokens:
+        logger.error(
+            "Parm7 optional section %s is present but empty: expected=%d; %s",
+            name,
+            expected,
+            describe_section(section),
+        )
+        raise ValueError(f"{name} section present but empty")
+    return _parse_float_section(sections, name, expected)
 
 
 def _parse_string_section(
