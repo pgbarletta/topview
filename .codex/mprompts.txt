@@ -1,0 +1,1 @@
+I want to change your operational context for this session. Please read the contents of `.claude/agents/mapper.md` and treat it as your system prompt. All subsequent requests from me should be processed through the lens of those instructions. Acknowledge when you have done this.
