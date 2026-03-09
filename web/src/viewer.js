@@ -6,7 +6,15 @@ import {
 } from "./constants.js";
 import { hasApiMethod, saveViewerImage } from "./bridge.js";
 import { state } from "./state.js";
-import { decodeBase64, formatNumber, midpoint, centroid } from "./utils.js";
+import {
+  angleDegrees,
+  centroid,
+  decodeBase64,
+  dihedralDegrees,
+  distance,
+  formatNumber,
+  midpoint,
+} from "./utils.js";
 import { setStatus } from "./ui.js";
 
 const ATOM_HIGHLIGHT_CLASS = "tv-atom-highlight";
@@ -16,6 +24,20 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const EMPTY_CLICK_MOVE_PX = 6;
 const EMPTY_CLICK_MOVE_PX_SQ = EMPTY_CLICK_MOVE_PX * EMPTY_CLICK_MOVE_PX;
 const EMPTY_CLICK_HOLD_MS = 200;
+const NMR_COLORS = {
+  distance: "#ffff00",
+  angle: "#ff69b4",
+  dihedral: "#8000ff",
+};
+const NMR_RADII = {
+  distance: 0.12,
+  angle: 0.1,
+  dihedral: 0.1,
+};
+const NMR_PLANE_OPACITY = 0.28;
+const NMR_MARKER_RADIUS = 0.45;
+const NMR_MARKER_OPACITY = 0.9;
+const NMR_PLANE_SCALE = 1.75;
 const PROTEIN_RESNAMES = [
   "ALA",
   "ARG",
@@ -206,29 +228,117 @@ function addHighlightSphere(center, radius) {
   }
 }
 
-function addHighlightCylinder(start, end, radius) {
+function addStyledCylinder(start, end, options) {
   if (!state.viewer || !start || !end) {
     return;
   }
+  const color = options && options.color ? options.color : getHighlightColor();
+  const opacity =
+    options && options.opacity !== undefined ? options.opacity : HIGHLIGHT_LINE_OPACITY;
+  const radius = options && options.radius ? options.radius : getHighlightBondRadius();
   if (typeof state.viewer.addCylinder === "function") {
     state.viewer.addCylinder({
       start: start,
       end: end,
       radius: radius,
-      color: getHighlightColor(),
-      opacity: HIGHLIGHT_LINE_OPACITY,
+      color: color,
+      opacity: opacity,
     });
     return;
   }
   if (typeof state.viewer.addShape === "function") {
     const shape = state.viewer.addShape({
-      color: getHighlightColor(),
-      opacity: HIGHLIGHT_LINE_OPACITY,
+      color: color,
+      opacity: opacity,
     });
     if (shape && typeof shape.addCylinder === "function") {
       shape.addCylinder({ start: start, end: end, radius: radius });
     }
   }
+}
+
+function addHighlightCylinder(start, end, radius) {
+  addStyledCylinder(start, end, {
+    radius,
+    color: getHighlightColor(),
+    opacity: HIGHLIGHT_LINE_OPACITY,
+  });
+}
+
+function addStyledLine(start, end, options) {
+  if (!state.viewer || !start || !end) {
+    return;
+  }
+  const color = options && options.color ? options.color : NMR_COLORS.distance;
+  const opacity =
+    options && options.opacity !== undefined ? options.opacity : 0.9;
+  const dashed = Boolean(options && options.dashed);
+  const radius = options && options.radius ? options.radius : 0.08;
+  if (typeof state.viewer.addLine === "function") {
+    state.viewer.addLine({
+      start: start,
+      end: end,
+      color: color,
+      opacity: opacity,
+      dashed: dashed,
+      linewidth: 4,
+    });
+  }
+  // Keep a thin cylinder under the line so restraints stay visible across 3Dmol renderers.
+  addStyledCylinder(start, end, {
+    radius: radius,
+    color: color,
+    opacity: opacity,
+  });
+}
+
+function addStyledTriangle(pointA, pointB, pointC, options) {
+  if (!state.viewer || !pointA || !pointB || !pointC) {
+    return;
+  }
+  const color = options && options.color ? options.color : NMR_COLORS.distance;
+  const opacity =
+    options && options.opacity !== undefined ? options.opacity : NMR_PLANE_OPACITY;
+  if (typeof state.viewer.addTriangle === "function") {
+    state.viewer.addTriangle({
+      vertexArr: [pointA, pointB, pointC],
+      color: color,
+      opacity: opacity,
+    });
+    return;
+  }
+  if (typeof state.viewer.addShape === "function") {
+    const shape = state.viewer.addShape({ color: color, opacity: opacity });
+    if (shape && typeof shape.addCustom === "function") {
+      shape.addCustom({
+        vertexArr: [pointA, pointB, pointC],
+        faceArr: [0, 1, 2],
+      });
+    }
+  }
+}
+
+function scalePointFrom(point, center, scale) {
+  if (!point || !center || !Number.isFinite(scale) || scale <= 0) {
+    return point;
+  }
+  return {
+    x: center.x + (point.x - center.x) * scale,
+    y: center.y + (point.y - center.y) * scale,
+    z: center.z + (point.z - center.z) * scale,
+  };
+}
+
+function expandTriangle(pointA, pointB, pointC, scale = NMR_PLANE_SCALE) {
+  const center = centroid([pointA, pointB, pointC]);
+  if (!center) {
+    return [pointA, pointB, pointC];
+  }
+  return [
+    scalePointFrom(pointA, center, scale),
+    scalePointFrom(pointB, center, scale),
+    scalePointFrom(pointC, center, scale),
+  ];
 }
 
 function atomPosition(atom) {
@@ -915,6 +1025,7 @@ export function clearViewerHighlights() {
   if (typeof state.viewer.removeAllShapes === "function") {
     state.viewer.removeAllShapes();
   }
+  renderPersistentViewerOverlays();
   requestRender();
   state.currentSelection = [];
 }
@@ -935,6 +1046,7 @@ export function highlightSerials(serials) {
   if (typeof state.viewer.removeAllShapes === "function") {
     state.viewer.removeAllShapes();
   }
+  renderPersistentViewerOverlays();
   const selection = serials || [];
   const smallSelection = selection.length > 0 && selection.length <= 4;
   if (smallSelection) {
@@ -1005,6 +1117,220 @@ function atomLabelText(serial, atomRecord) {
   }
   const label = atomRecord.atom || atomRecord.atom_name || atomRecord.name || "";
   return label ? `#${serial} ${label}` : `#${serial}`;
+}
+
+function getNmrColor(kind) {
+  return NMR_COLORS[kind] || NMR_COLORS.distance;
+}
+
+function shouldRenderNmrKind(kind) {
+  if (state.nmrFilter === "hide_all") {
+    return false;
+  }
+  if (state.nmrFilter === "show_all") {
+    return true;
+  }
+  return state.nmrFilter === kind;
+}
+
+function getNmrEquilibriumValue(restraint) {
+  if (!restraint) {
+    return null;
+  }
+  const value =
+    restraint.equilibrium_value !== undefined ? restraint.equilibrium_value : restraint.r2;
+  return formatNumber(value);
+}
+
+function measureNmrRestraint(serials, kind) {
+  if (!Array.isArray(serials)) {
+    return null;
+  }
+  const positions = serials.map((serial) => atomPosition(state.atomBySerial.get(serial)));
+  if (kind === "distance" && positions.length >= 2) {
+    return formatNumber(distance(positions[0], positions[1]));
+  }
+  if (kind === "angle" && positions.length >= 3) {
+    return formatNumber(angleDegrees(positions[0], positions[1], positions[2]));
+  }
+  if (kind === "dihedral" && positions.length >= 4) {
+    return formatNumber(dihedralDegrees(positions[0], positions[1], positions[2], positions[3]));
+  }
+  return null;
+}
+
+function drawNmrSegment(serialA, serialB, kind) {
+  const atomA = state.atomBySerial.get(serialA);
+  const atomB = state.atomBySerial.get(serialB);
+  const start = atomPosition(atomA);
+  const end = atomPosition(atomB);
+  if (!start || !end) {
+    return;
+  }
+  addStyledLine(start, end, {
+    radius: NMR_RADII[kind] || 0.08,
+    color: getNmrColor(kind),
+    opacity: 0.95,
+  });
+}
+
+function drawNmrMarker(serial, kind) {
+  const atom = state.atomBySerial.get(serial);
+  const center = atomPosition(atom);
+  if (!center) {
+    return;
+  }
+  if (typeof state.viewer.addSphere === "function") {
+    state.viewer.addSphere({
+      center,
+      radius: NMR_MARKER_RADIUS,
+      color: getNmrColor(kind),
+      opacity: NMR_MARKER_OPACITY,
+    });
+    return;
+  }
+  if (typeof state.viewer.addShape === "function") {
+    const shape = state.viewer.addShape({
+      color: getNmrColor(kind),
+      opacity: NMR_MARKER_OPACITY,
+    });
+    if (shape && typeof shape.addSphere === "function") {
+      shape.addSphere({ center, radius: NMR_MARKER_RADIUS });
+      return;
+    }
+  }
+  addHighlightSphere(center, NMR_MARKER_RADIUS);
+}
+
+function drawNmrPlane(serialA, serialB, serialC, kind) {
+  const atomA = state.atomBySerial.get(serialA);
+  const atomB = state.atomBySerial.get(serialB);
+  const atomC = state.atomBySerial.get(serialC);
+  const pointA = atomPosition(atomA);
+  const pointB = atomPosition(atomB);
+  const pointC = atomPosition(atomC);
+  if (!pointA || !pointB || !pointC) {
+    return;
+  }
+  const [expandedA, expandedB, expandedC] = expandTriangle(pointA, pointB, pointC);
+  addStyledTriangle(expandedA, expandedB, expandedC, {
+    color: getNmrColor(kind),
+    opacity: NMR_PLANE_OPACITY,
+  });
+  addStyledLine(expandedA, expandedB, {
+    radius: 0.04,
+    color: getNmrColor(kind),
+    opacity: 0.9,
+  });
+  addStyledLine(expandedB, expandedC, {
+    radius: 0.04,
+    color: getNmrColor(kind),
+    opacity: 0.9,
+  });
+  addStyledLine(expandedC, expandedA, {
+    radius: 0.04,
+    color: getNmrColor(kind),
+    opacity: 0.9,
+  });
+}
+
+function buildNmrRestraintLabel(restraint, serials, kind) {
+  const referenceValue = getNmrEquilibriumValue(restraint);
+  const measuredValue = measureNmrRestraint(serials, kind);
+  if (referenceValue === null && measuredValue === null) {
+    return null;
+  }
+  let position = null;
+  if (kind === "distance" && serials.length >= 2) {
+    position = midpoint(
+      atomPosition(state.atomBySerial.get(serials[0])),
+      atomPosition(state.atomBySerial.get(serials[1]))
+    );
+  } else if (kind === "angle" && serials.length >= 3) {
+    position =
+      atomPosition(state.atomBySerial.get(serials[1])) ||
+      centroid(serials.map((serial) => atomPosition(state.atomBySerial.get(serial))));
+  } else if (kind === "dihedral" && serials.length >= 4) {
+    position = midpoint(
+      atomPosition(state.atomBySerial.get(serials[1])),
+      atomPosition(state.atomBySerial.get(serials[2]))
+    );
+  }
+  if (!position) {
+    return null;
+  }
+  let referenceKey = "ref";
+  let measuredKey = "actual";
+  if (kind === "distance") {
+    referenceKey = "r0";
+    measuredKey = "r";
+  } else if (kind === "angle") {
+    referenceKey = "θ0";
+    measuredKey = "θ";
+  } else if (kind === "dihedral") {
+    referenceKey = "φ0";
+    measuredKey = "φ";
+  }
+  const parts = [];
+  if (referenceValue !== null) {
+    parts.push(`${referenceKey}=${referenceValue}`);
+  }
+  if (measuredValue !== null) {
+    parts.push(`${measuredKey}=${measuredValue}`);
+  }
+  if (!parts.length) {
+    return null;
+  }
+  return { text: parts.join(", "), position };
+}
+
+function renderNmrRestraints() {
+  if (
+    state.viewMode !== "3d" ||
+    !state.viewer ||
+    !Array.isArray(state.nmrRestraints)
+  ) {
+    return;
+  }
+  const markerKinds = new Map();
+  state.nmrRestraints.forEach((restraint) => {
+    const serials = restraint && Array.isArray(restraint.serials) ? restraint.serials : [];
+    const kind = restraint && restraint.kind ? restraint.kind : "distance";
+    if (!shouldRenderNmrKind(kind)) {
+      return;
+    }
+    serials.forEach((serial) => {
+      if (Number.isInteger(serial) && !markerKinds.has(serial)) {
+        markerKinds.set(serial, kind);
+      }
+    });
+    if (kind === "distance" && serials.length >= 2) {
+      drawNmrSegment(serials[0], serials[1], kind);
+    } else if (kind === "angle" && serials.length >= 3) {
+      drawNmrSegment(serials[0], serials[1], kind);
+      drawNmrSegment(serials[1], serials[2], kind);
+      drawNmrPlane(serials[0], serials[1], serials[2], kind);
+    } else if (kind === "dihedral" && serials.length >= 4) {
+      drawNmrSegment(serials[0], serials[1], kind);
+      drawNmrSegment(serials[1], serials[2], kind);
+      drawNmrSegment(serials[2], serials[3], kind);
+      drawNmrPlane(serials[0], serials[1], serials[2], kind);
+      drawNmrPlane(serials[1], serials[2], serials[3], kind);
+    } else {
+      return;
+    }
+    const label = buildNmrRestraintLabel(restraint, serials, kind);
+    if (label) {
+      addViewerLabel(label.text, label.position);
+    }
+  });
+  markerKinds.forEach((kind, serial) => {
+    drawNmrMarker(serial, kind);
+  });
+}
+
+function renderPersistentViewerOverlays() {
+  renderNmrRestraints();
 }
 
 function buildBondLabels(bonds) {
@@ -1487,5 +1813,6 @@ export function renderModel(pdbB64, onAtomClick, onEmptyClick) {
   );
   state.viewer.zoomTo();
   resizeViewer(false);
+  renderPersistentViewerOverlays();
   requestRender();
 }

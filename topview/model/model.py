@@ -194,7 +194,11 @@ class Model:
         return {"ok": True, "atom": meta.to_dict(), "highlights": highlights}
 
     def load_system(
-        self, parm7_path: str, rst7_path: Optional[str], resname: Optional[str] = None
+        self,
+        parm7_path: str,
+        rst7_path: Optional[str],
+        resname: Optional[str] = None,
+        nmr_path: Optional[str] = None,
     ) -> Dict[str, object]:
         """Load a parm7 system and populate model state.
 
@@ -223,6 +227,7 @@ class Model:
             parm7_path,
             rst7_path,
             resname=resname,
+            nmr_path=nmr_path,
             cpu_submit=self._cpu_submit,
         )
         info_future = None
@@ -249,6 +254,8 @@ class Model:
             self._state.bond_adjacency = None
             self._state.load_timings = result.timings
             self._state.load_started_at = load_started_at
+            self._state.nmr_restraints = list(result.nmr_restraints)
+            self._state.nmr_summary = dict(result.nmr_summary)
             self._state.loaded = True
         payload = {
             "ok": True,
@@ -256,6 +263,8 @@ class Model:
             "natoms": result.natoms,
             "nresidues": result.nresidues,
             "warnings": result.warnings,
+            "nmr_restraints": result.nmr_restraints,
+            "nmr_summary": result.nmr_summary,
         }
         if result.view_mode == "3d":
             payload["pdb_b64"] = result.pdb_b64

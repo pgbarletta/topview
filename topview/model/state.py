@@ -195,4 +195,6 @@ class ModelState:
     bond_adjacency: Optional[Dict[int, set[int]]] = None
     load_timings: Optional[Dict[str, float]] = None
     load_started_at: Optional[float] = None
+    nmr_restraints: List[Dict[str, object]] = field(default_factory=list)
+    nmr_summary: Dict[str, int] = field(default_factory=dict)
     loaded: bool = False

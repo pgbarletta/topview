@@ -51,6 +51,16 @@
             <div class="viewer-visibility-buttons" role="group" aria-label="Visibility toggles">
               <button id="toggle-water" type="button">Hide water</button>
               <button id="toggle-hydrogen" type="button">Hide H (non-water)</button>
+              <label id="nmr-filter-wrapper" class="viewer-visibility-select" hidden>
+                NMR
+                <select id="nmr-filter" aria-label="NMR visibility filter">
+                  <option value="hide_all">Hide all</option>
+                  <option value="show_all">Show all</option>
+                  <option value="distance">Show distance</option>
+                  <option value="angle">Show angle</option>
+                  <option value="dihedral">Show dihedral</option>
+                </select>
+              </label>
             </div>
             <div class="viewer-export-controls">
               <select id="viewer-export-scale" aria-label="Export scale">

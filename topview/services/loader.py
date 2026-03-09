@@ -18,6 +18,7 @@ from topview.config import CHARGE_SCALE, DEFAULT_RESNAME
 from topview.errors import ModelError
 from topview.model.state import AtomMeta, Parm7Section, ResidueMeta
 from topview.services.lj import compute_lj_tables
+from topview.services.nmr_restraints import parse_nmr_restraints, summarize_nmr_restraints
 from topview.services.parm7 import describe_section, parse_parm7, parse_pointers
 from topview.services.pdb_writer import write_pdb
 
@@ -70,6 +71,8 @@ class SystemLoadResult:
     natoms: int
     nresidues: int
     warnings: List[str]
+    nmr_restraints: List[Dict[str, object]]
+    nmr_summary: Dict[str, int]
     timings: Dict[str, float]
 
 
@@ -380,6 +383,7 @@ def _parmed_import_error_message(exc: Exception) -> str:
 def load_system_data_3d(
     parm7_path: str,
     rst7_path: str,
+    nmr_path: Optional[str] = None,
     cpu_submit: Optional[Callable[..., object]] = None,
 ) -> SystemLoadResult:
     """Load a parm7/rst7 pair into in-memory metadata.
@@ -479,6 +483,14 @@ def load_system_data_3d(
     atom_type_indices, lj_by_type, lj_time = _compute_lj_tables(
         parm7_sections, natom, ntypes
     )
+    try:
+        nmr_records = parse_nmr_restraints(nmr_path, natom=natom) if nmr_path else []
+    except ValueError as exc:
+        raise ModelError(
+            "nmr_parse_failed", "Failed to parse NMR restraints", str(exc)
+        ) from exc
+    nmr_restraints = [record.to_dict() for record in nmr_records]
+    nmr_summary = summarize_nmr_restraints(nmr_records)
 
     meta_list: List[AtomMeta] = []
     meta_by_serial: Dict[int, AtomMeta] = {}
@@ -651,6 +663,8 @@ def load_system_data_3d(
         natoms=len(meta_list),
         nresidues=len(universe.residues),
         warnings=warnings,
+        nmr_restraints=nmr_restraints,
+        nmr_summary=nmr_summary,
         timings=timings,
     )
 
@@ -658,11 +672,17 @@ def load_system_data_3d(
 def load_system_data_2d(
     parm7_path: str,
     resname: Optional[str] = None,
+    nmr_path: Optional[str] = None,
 ) -> SystemLoadResult:
     """Load a parm7-only system and build a 2D RDKit depiction."""
 
     if not parm7_path:
         raise ModelError("invalid_input", "parm7 path is required")
+    if nmr_path:
+        raise ModelError(
+            "invalid_input",
+            "NMR restraints require a 3D load with both parm7 and rst7 paths",
+        )
     if not os.path.exists(parm7_path):
         raise ModelError("file_not_found", "parm7 file not found", parm7_path)
 
@@ -930,6 +950,8 @@ def load_system_data_2d(
         natoms=len(meta_list),
         nresidues=len(residues),
         warnings=warnings,
+        nmr_restraints=[],
+        nmr_summary=summarize_nmr_restraints([]),
         timings=timings,
     )
 
@@ -938,6 +960,7 @@ def load_system_data(
     parm7_path: str,
     rst7_path: Optional[str] = None,
     resname: Optional[str] = None,
+    nmr_path: Optional[str] = None,
     cpu_submit: Optional[Callable[..., object]] = None,
 ) -> SystemLoadResult:
     """Load topology and optional coordinates into in-memory metadata.
@@ -958,9 +981,11 @@ def load_system_data(
         return load_system_data_3d(
             parm7_path,
             rst7_path,
+            nmr_path=nmr_path,
             cpu_submit=cpu_submit,
         )
     return load_system_data_2d(
         parm7_path,
         resname=resname,
+        nmr_path=nmr_path,
     )
