@@ -1,5 +1,5 @@
 export const DEFAULT_SELECTION_MODE = "Atom";
-export const DEFAULT_STYLE_KEY = "sticks";
+export const DEFAULT_STYLE_KEY = "cartoon_detail";
 export const HIGHLIGHT_COLOR = "#111827";
 export const HIGHLIGHT_ATOM_OPACITY = 0.2;
 export const HIGHLIGHT_LINE_OPACITY = 0.65;
@@ -45,8 +45,8 @@ export const STYLE_PRESETS = {
   lines: { line: {} },
   ballstick: { stick: { radius: 0.2 }, sphere: { scale: 0.3 } },
   cartoon: { cartoon: { color: "spectrum" } },
-  cartoon_ligand: {
-    protein: { cartoon: { color: "spectrum" } },
+  cartoon_detail: {
+    biopolymer: { cartoon: { color: "spectrum" } },
     other: { stick: { radius: 0.2 } },
   },
 };

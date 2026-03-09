@@ -46,7 +46,7 @@
 - Load pipeline + per-atom metadata: `topview/services/loader.py`.
 - Selection/highlight semantics: `topview/model/highlights.py`, `topview/services/system_info_selection.py`.
 - System info table schema: `topview/services/system_info.py`.
-- UI mode/state contracts: `web/src/constants.js`, `web/src/state.js`.
+- UI mode/state contracts and default viewer style policy: `web/src/constants.js`, `web/src/state.js`, `web/src/viewer.js`.
 
 ### FILE INDEX (priority scored)
 Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
@@ -56,7 +56,7 @@ Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 3. `P0` | `topview/services/loader.py` | py | 966 | `5ebe31cf` | Main data ingress (3D/2D), metadata, LJ, depiction.
 4. `P0` | `topview/model/model.py` | py | 729 | `e4edd6fb` | Central state manager and API-facing behavior.
 5. `P0` | `topview/bridge.py` | py | 619 | `0f692ed9` | Python-JS RPC boundary.
-6. `P0` | `web/src/viewer.js` | js | 1429 | `e26e5b8b` | 3D/2D rendering, highlighting, labeling, export.
+6. `P0` | `web/src/viewer.js` | js | 1438 | `23ea8bdd` | 3D/2D rendering, highlighting, labeling, export.
 7. `P0` | `web/src/system_info.js` | js | 790 | `c52eb317` | Info panel rendering/sorting/selection bridging.
 8. `P0` | `topview/services/system_info_selection.py` | py | 329 | `9f0f32f9` | Row-to-selection mapping index.
 9. `P1` | `topview/services/parm7.py` | py | 471 | `1605e6fd` | Token parser + pointer decode + ref descriptions.
@@ -73,10 +73,10 @@ Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 20. `P2` | `topview/worker.py` | py | 82 | `80ce17ea` | Thread/process executor abstraction.
 21. `P2` | `topview/config.py` | py | 51 | `e4c9445b` | Global constants/paths.
 22. `P2` | `topview/errors.py` | py | 98 | `79ecbc1f` | Error model + API payload builder.
-23. `P2` | `web/src/constants.js` | js | 52 | `95f70c7d` | Mode/style constants.
+23. `P2` | `web/src/constants.js` | js | 52 | `2c72b75f` | Mode/style constants.
 24. `P2` | `web/src/state.js` | js | 65 | `0f64a007` | Shared frontend mutable state.
 25. `P2` | `web/src/utils.js` | js | 83 | `06622dfb` | Frontend helpers.
-26. `P2` | `web/index.html` | html | 97 | `1794becf` | UI layout skeleton.
+26. `P2` | `web/index.html` | html | 98 | `9375aaea` | UI layout skeleton.
 27. `P2` | `web/styles.css` | css | 815 | `b630da3d` | UI styling/themes.
 28. `P2` | `scripts/check_parm7_dihedrals.py` | py | 278 | `82e18230` | External diagnostic script.
 29. `P3` | `tests/test_system_info_selection.py` | py | 179 | `67922872` | Core row-selection correctness tests.
@@ -129,6 +129,11 @@ Core user workflows:
 - Desktop GUI via `topview` CLI (`pywebview` host + HTML/JS frontend).
 - Programmatic model/service usage in tests.
 - Diagnostic script mode via `scripts/check_parm7_dihedrals.py`.
+
+Default 3D presentation:
+- Proteins and nucleic acids default to cartoon rendering.
+- Non-biopolymer atoms default to sticks so ligands/ions/waters remain inspectable.
+- Explicit viewer style changes still override the default preset.
 
 ### Startup Spine
 1. `topview/app.py` parses CLI args and creates window/API/model/worker.
@@ -738,6 +743,8 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - Globals/Constants:
     - default modes/style keys and highlight constants.
+    - `DEFAULT_STYLE_KEY`
+    - default 3D preset key is `cartoon_detail` (proteins/nucleic acids cartoon, other atoms sticks).
     - `SECTION_MODE_MAP`
     - `STYLE_PRESETS`
 
@@ -765,6 +772,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - Globals/Constants:
     - highlight CSS class ids, overlay constants.
+    - residue-name driven biopolymer selector constants for default cartoon rendering.
   - Exported Functions:
     - `requestRender()`
     - `applyTheme(isDark)`
@@ -784,7 +792,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `renderInteractionLabels(interaction)`
     - `render2dModel(depiction, onAtomClick, onEmptyClick)`
     - `renderModel(pdbB64, onAtomClick, onEmptyClick)`
-  - Internal helpers include label builders, 2D click target overlay, and empty-click selection handling.
+  - Internal helpers include label builders, `applySplitStylePreset(preset)` using explicit protein/nucleic residue-name selection, 2D click target overlay, and empty-click selection handling.
 
 ## `web/src/ui.js`
 - Role: status, mode tabs, selection summary/details, about panel, and loading/UI config behavior.
@@ -876,6 +884,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Key dependencies: `styles.css`, `src/app.js` module.
 - Defines:
   - DOM anchors for mode tabs, viewer controls, info panel tabs/content, and parm7 sections/view.
+  - Viewer style selector includes the default `Cartoon + sticks` option.
 
 ## `web/styles.css`
 - Role: visual theme/layout and interaction styles.

@@ -14,10 +14,10 @@ You will produce a **complete codebase map** that future agents can use to:
 ---
 
 ## Output Location Requirement
-- All documentation you produce **must be saved inside the repository** under: `codebase-analysis-docs/`
+- All documentation you produce **must be saved inside the repository** under: `codebase-docs/`
 - If that folder does not exist, **create it**.
-- The **final master document** must be: `codebase-analysis-docs/codebasemap.md`
-- Any diagrams or supplemental files must be stored in: `codebase-analysis-docs/assets/`
+- The **final master document** must be: `codebase-docs/codebasemap.md`
+- Any diagrams or supplemental files must be stored in: `codebase-docs/assets/`
 - All file references must use **relative paths from the repo root**.
 
 ---
@@ -244,8 +244,8 @@ A searchable reference section including:
   9. Open Questions / Assumptions
 - Ensure every major claim is tied to a file, symbol, or config.
 - Save final output to:
-  - `codebase-analysis-docs/codebasemap.md`
-  - diagrams/assets to `codebase-analysis-docs/assets/`
+  - `codebase-docs/codebasemap.md`
+  - diagrams/assets to `codebase-docs/assets/`
 
 ---
 
