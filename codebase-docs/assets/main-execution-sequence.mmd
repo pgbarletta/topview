@@ -8,17 +8,17 @@ sequenceDiagram
   participant Loader as services/loader.py
   participant UI as web/src/app.js
 
-  User->>CLI: topview file.parm7 [file.rst7]
+  User->>CLI: topview file.parm7 [file.rst7] [--nmr rest.in]
   CLI->>App: create_app(initial_paths)
   App->>API: construct Api(model, worker)
   App->>UI: pywebview loads web/index.html
   UI->>API: get_initial_paths()
-  UI->>API: load_system(parm7, rst7, resname)
+  UI->>API: load_system(parm7, rst7, resname, nmr_path)
   API->>Worker: submit(Model.load_system)
   Worker->>Model: load_system(...)
   Model->>Loader: load_system_data(...)
-  Loader-->>Model: SystemLoadResult (3d: pdb_b64 | 2d: depiction)
-  Model-->>API: load payload (natoms, nresidues, warnings)
+  Loader-->>Model: SystemLoadResult (3d: pdb_b64 + nmr_restraints | 2d: depiction)
+  Model-->>API: load payload (natoms, nresidues, warnings, nmr_summary)
   API-->>UI: {ok: true, view_mode, model payload}
   UI->>API: get_parm7_text()
   UI->>API: get_parm7_sections()

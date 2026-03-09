@@ -52,7 +52,53 @@ function loadFromInputs() {
   loadSystem(parm7, rst7 || null);
 }
 
-async function loadSystem(parm7Path, rst7Path, resname) {
+function emptyNmrSummary() {
+  return { distance: 0, angle: 0, dihedral: 0, total: 0 };
+}
+
+function normalizeNmrFilter(value) {
+  if (
+    value === "hide_all" ||
+    value === "show_all" ||
+    value === "distance" ||
+    value === "angle" ||
+    value === "dihedral"
+  ) {
+    return value;
+  }
+  return "show_all";
+}
+
+function resetNmrUiState() {
+  state.nmrRestraints = [];
+  state.nmrSummary = emptyNmrSummary();
+  state.nmrFilter = "show_all";
+}
+
+function updateNmrFilterControl() {
+  const wrapper = document.getElementById("nmr-filter-wrapper");
+  const select = document.getElementById("nmr-filter");
+  if (!wrapper || !select) {
+    return;
+  }
+  const hasNmr = Array.isArray(state.nmrRestraints) && state.nmrRestraints.length > 0;
+  const visible = hasNmr && state.viewMode === "3d";
+  wrapper.hidden = !visible;
+  select.value = normalizeNmrFilter(state.nmrFilter);
+}
+
+function formatNmrSummary(summary) {
+  if (!summary || !summary.total) {
+    return "";
+  }
+  const parts = [];
+  if (summary.distance) parts.push(`${summary.distance} distance`);
+  if (summary.angle) parts.push(`${summary.angle} angle`);
+  if (summary.dihedral) parts.push(`${summary.dihedral} dihedral`);
+  return parts.length ? ` NMR restraints: ${parts.join(", ")}.` : "";
+}
+
+async function loadSystem(parm7Path, rst7Path, resname, nmrPath) {
   if (!hasApiMethod("load_system")) {
     reportError("pywebview API not available");
     return;
@@ -74,17 +120,22 @@ async function loadSystem(parm7Path, rst7Path, resname) {
   setStatus("loading", "Loading system...");
 
   try {
-    const result = await apiLoadSystem(parm7Path, rst7Path, resname);
+    const result = await apiLoadSystem(parm7Path, rst7Path, resname, nmrPath);
     if (!result || !result.ok) {
       const msg = result && result.error ? result.error.message : "Failed to load";
       reportError(msg);
       setLoading(false);
       return;
     }
+    state.nmrRestraints = result.nmr_restraints || [];
+    state.nmrSummary = result.nmr_summary || emptyNmrSummary();
+    state.nmrFilter = "show_all";
     console.debug(
       `load_system completed in ${(performance.now() - loadStart).toFixed(1)}ms`
     );
     if (result.view_mode === "2d") {
+      resetNmrUiState();
+      updateNmrFilterControl();
       const rendered = render2dModel(result.depiction, selectAtom, clearSelection);
       if (!rendered) {
         setLoading(false);
@@ -98,7 +149,9 @@ async function loadSystem(parm7Path, rst7Path, resname) {
           : "";
       setStatus(
         "success",
-        `Loaded ${label} (${result.natoms} atoms, ${result.nresidues} residues).${warn}`
+        `Loaded ${label} (${result.natoms} atoms, ${result.nresidues} residues).${warn}${formatNmrSummary(
+          state.nmrSummary
+        )}`
       );
       setLoading(false);
     } else {
@@ -108,6 +161,7 @@ async function loadSystem(parm7Path, rst7Path, resname) {
         return;
       }
       renderModel(result.pdb_b64, selectAtom, clearSelection);
+      updateNmrFilterControl();
       applyViewerStylePreset(state.currentStyleKey, false);
       resizeViewer(true);
       const warn =
@@ -116,7 +170,9 @@ async function loadSystem(parm7Path, rst7Path, resname) {
           : "";
       setStatus(
         "success",
-        `Loaded ${result.natoms} atoms, ${result.nresidues} residues.${warn}`
+        `Loaded ${result.natoms} atoms, ${result.nresidues} residues.${warn}${formatNmrSummary(
+          state.nmrSummary
+        )}`
       );
       setLoading(false);
     }
@@ -177,6 +233,7 @@ function setInitialPaths(payload) {
   const parm7Path = payload.parm7 || payload.parm7_path || "";
   const rst7Path = payload.rst7 || payload.rst7_path || "";
   const resname = payload.resname || "";
+  const nmrPath = payload.nmr || payload.nmr_path || "";
   if (!parm7Path) {
     return;
   }
@@ -189,10 +246,10 @@ function setInitialPaths(payload) {
     rst7Input.value = rst7Path;
   }
   if (hasApiMethod("load_system")) {
-    loadSystem(parm7Path, rst7Path || null, resname || null);
+    loadSystem(parm7Path, rst7Path || null, resname || null, nmrPath || null);
     return;
   }
-  state.pendingLoad = { parm7: parm7Path, rst7: rst7Path, resname: resname };
+  state.pendingLoad = { parm7: parm7Path, rst7: rst7Path, resname: resname, nmr: nmrPath };
   window.__pendingLoad = state.pendingLoad;
 }
 
@@ -267,6 +324,7 @@ function updateVisibilityButtons() {
   if (hydrogenBtn) {
     hydrogenBtn.textContent = state.hideHydrogen ? "Show H (non-water)" : "Hide H (non-water)";
   }
+  updateNmrFilterControl();
 }
 
 function applyViewerStylePreset(key, renderNow = true) {
@@ -290,6 +348,7 @@ function attachEvents() {
   const clearBtn = document.getElementById("clear-btn");
   const waterBtn = document.getElementById("toggle-water");
   const hydrogenBtn = document.getElementById("toggle-hydrogen");
+  const nmrFilter = document.getElementById("nmr-filter");
   const filterBtn = document.getElementById("filter-btn");
   const aboutBtn = document.getElementById("about-btn");
   const themeBtn = document.getElementById("theme-btn");
@@ -310,6 +369,13 @@ function attachEvents() {
     hydrogenBtn.addEventListener("click", () => {
       state.hideHydrogen = !state.hideHydrogen;
       updateVisibilityButtons();
+      applyViewerStylePreset(state.currentStyleKey);
+    });
+  }
+  if (nmrFilter) {
+    nmrFilter.addEventListener("change", (event) => {
+      state.nmrFilter = normalizeNmrFilter(event.target.value);
+      updateNmrFilterControl();
       applyViewerStylePreset(state.currentStyleKey);
     });
   }
@@ -361,6 +427,7 @@ window.addEventListener("pywebviewready", async function () {
             parm7: result.parm7_path,
             rst7: result.rst7_path,
             resname: result.resname,
+            nmr_path: result.nmr_path,
           });
         }
       })
@@ -370,7 +437,7 @@ window.addEventListener("pywebviewready", async function () {
     const payload = state.pendingLoad;
     state.pendingLoad = null;
     window.__pendingLoad = null;
-    loadSystem(payload.parm7, payload.rst7 || null, payload.resname || null);
+    loadSystem(payload.parm7, payload.rst7 || null, payload.resname || null, payload.nmr || null);
   }
 });
 

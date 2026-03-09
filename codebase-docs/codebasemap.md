@@ -44,6 +44,7 @@
 ### Sources of Truth
 - Format parser and tokenization: `topview/services/parm7.py`.
 - Load pipeline + per-atom metadata: `topview/services/loader.py`.
+- Amber NMR restraint parsing and validation: `topview/services/nmr_restraints.py`.
 - Selection/highlight semantics: `topview/model/highlights.py`, `topview/services/system_info_selection.py`.
 - System info table schema: `topview/services/system_info.py`.
 - UI mode/state contracts and default viewer style policy: `web/src/constants.js`, `web/src/state.js`, `web/src/viewer.js`.
@@ -53,46 +54,48 @@ Format: `(#) PRIORITY | PATH | TYPE | LINES | HASH8 | NOTES`
 
 1. `P0` | `topview/model/highlights.py` | py | 1084 | `acd2a5b7` | Core selection/highlight semantics across all modes.
 2. `P0` | `topview/services/system_info.py` | py | 1263 | `5294a8e8` | Builds all info tables and rotatable/improper rules.
-3. `P0` | `topview/services/loader.py` | py | 966 | `5ebe31cf` | Main data ingress (3D/2D), metadata, LJ, depiction.
-4. `P0` | `topview/model/model.py` | py | 729 | `e4edd6fb` | Central state manager and API-facing behavior.
-5. `P0` | `topview/bridge.py` | py | 619 | `0f692ed9` | Python-JS RPC boundary.
-6. `P0` | `web/src/viewer.js` | js | 1438 | `23ea8bdd` | 3D/2D rendering, highlighting, labeling, export.
+3. `P0` | `topview/services/loader.py` | py | 991 | `8b503e2a` | Main data ingress (3D/2D), metadata, LJ, depiction, and optional NMR restraint payloads.
+4. `P0` | `topview/model/model.py` | py | 738 | `b58359cb` | Central state manager and API-facing behavior.
+5. `P0` | `topview/bridge.py` | py | 641 | `8672eabb` | Python-JS RPC boundary.
+6. `P0` | `web/src/viewer.js` | js | 1806 | `757b3d59` | 3D/2D rendering, highlighting, labeling, export, and filtered/color-coded NMR line/plane/marker overlays with reference/measured labels.
 7. `P0` | `web/src/system_info.js` | js | 790 | `c52eb317` | Info panel rendering/sorting/selection bridging.
 8. `P0` | `topview/services/system_info_selection.py` | py | 329 | `9f0f32f9` | Row-to-selection mapping index.
 9. `P1` | `topview/services/parm7.py` | py | 471 | `1605e6fd` | Token parser + pointer decode + ref descriptions.
 10. `P1` | `topview/services/lj.py` | py | 271 | `b1bec2d7` | LJ table math and validation.
-11. `P1` | `web/src/app.js` | js | 399 | `5f276ae3` | Frontend bootstrap/orchestration.
+11. `P1` | `web/src/app.js` | js | 466 | `dbfc228e` | Frontend bootstrap/orchestration and NMR overlay dropdown/filter UI control wiring.
 12. `P1` | `web/src/selection.js` | js | 350 | `a4a7bea8` | Selection state machine.
 13. `P1` | `web/src/parm7.js` | js | 452 | `f4f2839c` | Parm7 virtualization/highlight panel.
 14. `P1` | `web/src/ui.js` | js | 474 | `42554192` | Details/about/status rendering.
-15. `P1` | `topview/app.py` | py | 125 | `f7d24713` | CLI + app startup.
-16. `P1` | `topview/model/state.py` | py | 198 | `932022a2` | Core typed state contracts.
+15. `P1` | `topview/app.py` | py | 136 | `9e1756a8` | CLI + app startup.
+16. `P1` | `topview/model/state.py` | py | 200 | `cbd0bbf7` | Core typed state contracts.
 17. `P1` | `topview/model/query.py` | py | 103 | `ecc12646` | Atom filtering.
-18. `P1` | `web/src/bridge.js` | js | 155 | `f64a5b0a` | JS RPC wrapper.
-19. `P2` | `topview/services/pdb_writer.py` | py | 83 | `293febc1` | PDB serialization.
-20. `P2` | `topview/worker.py` | py | 82 | `80ce17ea` | Thread/process executor abstraction.
-21. `P2` | `topview/config.py` | py | 51 | `e4c9445b` | Global constants/paths.
-22. `P2` | `topview/errors.py` | py | 98 | `79ecbc1f` | Error model + API payload builder.
-23. `P2` | `web/src/constants.js` | js | 52 | `2c72b75f` | Mode/style constants.
-24. `P2` | `web/src/state.js` | js | 65 | `0f64a007` | Shared frontend mutable state.
-25. `P2` | `web/src/utils.js` | js | 83 | `06622dfb` | Frontend helpers.
-26. `P2` | `web/index.html` | html | 98 | `9375aaea` | UI layout skeleton.
-27. `P2` | `web/styles.css` | css | 815 | `b630da3d` | UI styling/themes.
-28. `P2` | `scripts/check_parm7_dihedrals.py` | py | 278 | `82e18230` | External diagnostic script.
-29. `P3` | `tests/test_system_info_selection.py` | py | 179 | `67922872` | Core row-selection correctness tests.
-30. `P3` | `tests/test_rotatable_dihedral.py` | py | 98 | `c5202c5e` | Rotatable/dihedral table tests.
-31. `P3` | `tests/test_lj_parmed.py` | py | 53 | `2b32b193` | LJ parity with ParmEd.
-32. `P3` | `tests/test_improper_selection.py` | py | 48 | `8c9d0de6` | Improper sign convention test.
-33. `P3` | `tests/test_rdkit_depiction.py` | py | 34 | `3c247c49` | 2D depiction load path.
-34. `P3` | `tests/test_mapping.py` | py | 43 | `a13a562f` | PDB serial ordering test.
-35. `P3` | `tests/test_cli.py` | py | 14 | `fdce451b` | CLI arg defaults.
-36. `P3` | `README.md` | md | 51 | `7640f79f` | User-facing usage docs.
-37. `P3` | `pyproject.toml` | toml | 45 | `ea2826f3` | Packaging/dependency metadata.
-38. `P3` | `topview/__main__.py` | py | 7 | `85f9c680` | `python -m topview` entry.
-39. `P3` | `topview/cli/topview.py` | py | 13 | `8c1bf167` | console script entry.
-40. `P3` | `topview/__init__.py` | py | 5 | `ed32e657` | package version export.
-41. `P3` | `topview/logging_config.py` | py | 52 | `0a6bf678` | logging setup.
-42. `P3` | `topview/model/__init__.py` | py | 6 | `bd820985` | model exports.
+18. `P1` | `web/src/bridge.js` | js | 159 | `eba55f95` | JS RPC wrapper.
+19. `P1` | `topview/services/nmr_restraints.py` | py | 212 | `8ecdb9c2` | Amber `&rst` restraint parser/validator with trailing-zero trimming and equilibrium-value payload support.
+20. `P2` | `topview/services/pdb_writer.py` | py | 83 | `293febc1` | PDB serialization.
+21. `P2` | `topview/worker.py` | py | 82 | `80ce17ea` | Thread/process executor abstraction.
+22. `P2` | `topview/config.py` | py | 51 | `e4c9445b` | Global constants/paths.
+23. `P2` | `topview/errors.py` | py | 98 | `79ecbc1f` | Error model + API payload builder.
+24. `P2` | `web/src/constants.js` | js | 52 | `2c72b75f` | Mode/style constants.
+25. `P2` | `web/src/state.js` | js | 68 | `c0f27d64` | Shared frontend mutable state, including persistent NMR overlay payloads and NMR filter state.
+26. `P2` | `web/src/utils.js` | js | 194 | `3aa93b99` | Frontend helpers, including geometry utilities for distance/angle/dihedral measurement.
+27. `P2` | `web/index.html` | html | 108 | `9177884d` | UI layout skeleton, including NMR filter dropdown markup.
+28. `P2` | `web/styles.css` | css | 832 | `5ad68a62` | UI styling/themes, including NMR filter dropdown styling.
+29. `P2` | `scripts/check_parm7_dihedrals.py` | py | 278 | `82e18230` | External diagnostic script.
+30. `P3` | `tests/test_system_info_selection.py` | py | 179 | `67922872` | Core row-selection correctness tests.
+31. `P3` | `tests/test_rotatable_dihedral.py` | py | 98 | `c5202c5e` | Rotatable/dihedral table tests.
+32. `P3` | `tests/test_lj_parmed.py` | py | 53 | `2b32b193` | LJ parity with ParmEd.
+33. `P3` | `tests/test_improper_selection.py` | py | 48 | `8c9d0de6` | Improper sign convention test.
+34. `P3` | `tests/test_rdkit_depiction.py` | py | 34 | `3c247c49` | 2D depiction load path.
+35. `P3` | `tests/test_mapping.py` | py | 43 | `a13a562f` | PDB serial ordering test.
+36. `P3` | `tests/test_cli.py` | py | 19 | `adf89194` | CLI arg defaults and `--nmr` override.
+37. `P3` | `tests/test_nmr_restraints.py` | py | 110 | `469c72af` | Amber `&rst` restraint parser coverage, including trailing-zero classification and equilibrium-value serialization.
+38. `P3` | `README.md` | md | 51 | `7640f79f` | User-facing usage docs.
+39. `P3` | `pyproject.toml` | toml | 45 | `ea2826f3` | Packaging/dependency metadata.
+40. `P3` | `topview/__main__.py` | py | 7 | `85f9c680` | `python -m topview` entry.
+41. `P3` | `topview/cli/topview.py` | py | 13 | `8c1bf167` | console script entry.
+42. `P3` | `topview/__init__.py` | py | 5 | `ed32e657` | package version export.
+43. `P3` | `topview/logging_config.py` | py | 52 | `0a6bf678` | logging setup.
+44. `P3` | `topview/model/__init__.py` | py | 6 | `bd820985` | model exports.
 43. `P3` | `topview/services/__init__.py` | py | 1 | `64dfd3ea` | services package marker.
 44. `P3` | `topview/cli/__init__.py` | py | 1 | `d27ff657` | cli package marker.
 45. `P3` | `web/vendor/3Dmol-min.js` | js(min) | 1 | `c24a17b2` | Third-party vendor bundle.
@@ -129,11 +132,15 @@ Core user workflows:
 - Desktop GUI via `topview` CLI (`pywebview` host + HTML/JS frontend).
 - Programmatic model/service usage in tests.
 - Diagnostic script mode via `scripts/check_parm7_dihedrals.py`.
+- Optional Amber NMR restraint overlay mode via `--nmr path/to/rest.in` on 3D loads.
 
 Default 3D presentation:
 - Proteins and nucleic acids default to cartoon rendering.
 - Non-biopolymer atoms default to sticks so ligands/ions/waters remain inspectable.
 - Explicit viewer style changes still override the default preset.
+- Amber NMR `&rst` restraints, when provided, are classified by effective atom count after trimming an optional trailing `iat=0` sentinel: 2 atoms => distance, 3 => angle, 4 => dihedral.
+- Distance restraints render as yellow overlays, angle restraints as pink overlays, and dihedral restraints as purple overlays; angle/dihedral restraints still use enlarged triangular planes and all visible restraints can show their `r2` equilibrium value as a numeric label.
+- The viewer exposes a conditional NMR dropdown with `Hide all`, `Show all`, `Show distance`, `Show angle`, and `Show dihedral` options when NMR restraints are loaded.
 
 ### Startup Spine
 1. `topview/app.py` parses CLI args and creates window/API/model/worker.
@@ -169,6 +176,7 @@ Default 3D presentation:
   - `topview/model/query.py`
 - Data services:
   - `topview/services/loader.py`
+  - `topview/services/nmr_restraints.py`
   - `topview/services/parm7.py`
   - `topview/services/lj.py`
   - `topview/services/system_info.py`
@@ -181,7 +189,7 @@ Default 3D presentation:
 1. Load request enters `Api.load_system` and is dispatched on worker.
 2. `Model.load_system` calls `load_system_data`.
 3. `load_system_data` chooses:
-   - 3D path (`load_system_data_3d`): MDAnalysis universe + parm7 parse in parallel.
+   - 3D path (`load_system_data_3d`): MDAnalysis universe + parm7 parse in parallel, plus optional Amber NMR restraint parse/validation.
    - 2D path (`load_system_data_2d`): parm7 parse + ParmEd + RDKit depiction.
 4. Loader builds atom metadata (`AtomMeta`) including:
    - residue identity
@@ -196,6 +204,7 @@ Default 3D presentation:
    - parm7 text/sections for virtualized source display
    - system info tables for tabular navigation
    - selection-driven highlights and interaction payloads
+   - initial optional `nmr_path` passed through `load_system(...)` for persistent overlay rendering
 
 ### Parallelism Model
 - Backend:
@@ -441,8 +450,8 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Key dependencies: `webview`, `topview.bridge.Api`, `topview.model.Model`, `topview.worker.Worker`.
 - Defines:
   - Functions:
-    - `_parse_args(argv)`: parse CLI args (`parm7_path`, `rst7_path`, `resname`, logging/font options).
-    - `create_app(initial_paths, info_font_size, initial_resname)`: construct worker/model/API/window.
+    - `_parse_args(argv)`: parse CLI args (`parm7_path`, `rst7_path`, optional `--nmr`, `resname`, logging/font options).
+    - `create_app(initial_paths, info_font_size, initial_resname, initial_nmr_path)`: construct worker/model/API/window.
     - `main()`: configure logging, create app, start pywebview.
 
 ## `topview/bridge.py`
@@ -471,6 +480,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `log_client_error(payload)`
   - Notes:
     - Standardizes all unexpected exceptions into `error_result(...)` payloads.
+    - Passes optional CLI-supplied `nmr_path` through initial load and explicit `load_system(...)` calls.
 
 ## `topview/cli/__init__.py`
 - Role: CLI package marker.
@@ -535,6 +545,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `AtomMeta.to_dict()`
   - Notes:
     - `ModelState` stores lazy caches and background futures.
+    - NMR restraint payloads are cached separately from selection/highlight state.
 
 ## `topview/model/query.py`
 - Role: atom-filter logic for frontend query UI.
@@ -593,6 +604,8 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `_bond_key(row_map)`
     - `_angle_key(row_map)`
     - `_selection_result(mode, selections, cursor_idx)`
+  - Notes:
+    - `load_system(...)` now forwards optional NMR restraint data to the frontend load payload.
 
 ## `topview/services/__init__.py`
 - Role: services package marker.
@@ -644,9 +657,26 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `_format_element(element)`
     - `write_pdb(atom_metas)`
 
+## `topview/services/nmr_restraints.py`
+- Role: parse Amber `&rst` restraint files for 3D display overlays.
+- Key dependencies: standard `dataclasses`, `os`.
+- Defines:
+  - Classes:
+    - `NmrRestraint`
+  - Methods:
+    - `NmrRestraint.to_dict()`
+  - Functions:
+    - `parse_nmr_restraints(path, natom)`
+    - `summarize_nmr_restraints(restraints)`
+    - helper functions for block parsing, numeric validation, and atom-count checks.
+  - Notes:
+    - Supports explicit atom-index restraints with 2, 3, or 4 effective atoms, after trimming an optional trailing `iat=0` sentinel used by some restraint files.
+    - Serializes `equilibrium_value` from `r2` for frontend labeling.
+    - Rejects files with no `&rst` blocks, non-trailing zero/group restraints, and out-of-range atom indices.
+
 ## `topview/services/loader.py`
 - Role: end-to-end system loading pipeline (3D and 2D).
-- Key dependencies: MDAnalysis, ParmEd, RDKit, parm7 parser, LJ and PDB services.
+- Key dependencies: MDAnalysis, ParmEd, RDKit, parm7 parser, LJ, PDB, and NMR restraint services.
 - Defines:
   - Classes:
     - `SystemLoadResult`
@@ -658,11 +688,13 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `_compute_lj_tables(parm7_sections, natom, ntypes)`
     - `_build_rdkit_depiction(residue, resname, width=600, height=400)`
     - `_parmed_import_error_message(exc)`
-    - `load_system_data_3d(parm7_path, rst7_path, cpu_submit=None)`
-    - `load_system_data_2d(parm7_path, resname=None)`
-    - `load_system_data(parm7_path, rst7_path=None, resname=None, cpu_submit=None)`
+    - `load_system_data_3d(parm7_path, rst7_path, nmr_path=None, cpu_submit=None)`
+    - `load_system_data_2d(parm7_path, resname=None, nmr_path=None)`
+    - `load_system_data(parm7_path, rst7_path=None, resname=None, nmr_path=None, cpu_submit=None)`
   - Notes:
     - 3D path parallelizes universe load and parm7 parse.
+    - Optional `nmr_path` is validated against the loaded topology atom count and serialized for the frontend.
+    - 2D mode rejects NMR overlays because there is no 3D restraint display surface.
 
 ## `topview/services/system_info.py`
 - Role: builds info-panel tables from parsed parm7 sections.
@@ -735,7 +767,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `getApi()`
     - `hasApiMethod(name)`
     - `callApi(name, payload)`
-    - RPC wrappers: `getUiConfig`, `getInitialPaths`, `loadSystem`, `getParm7Text`, `getParm7Sections`, `getSystemInfo`, `getSystemInfoSelection`, `saveSystemInfoCsv`, `saveViewerImage`, `getAtomBundle`, `getAtomInfo`, `getParm7Highlights`, `queryAtoms`, `selectFiles`, `logClientError`.
+    - RPC wrappers: `getUiConfig`, `getInitialPaths`, `loadSystem` (including optional `nmr_path`), `getParm7Text`, `getParm7Sections`, `getSystemInfo`, `getSystemInfoSelection`, `saveSystemInfoCsv`, `saveViewerImage`, `getAtomBundle`, `getAtomInfo`, `getParm7Highlights`, `queryAtoms`, `selectFiles`, `logClientError`.
 
 ## `web/src/constants.js`
 - Role: frontend global constants and mappings.
@@ -753,7 +785,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Key dependencies: constants.
 - Defines:
   - Globals/Constants:
-    - `state` object containing viewer, selection, cache, sorting, parm7 virtualization, and 2D depiction state.
+    - `state` object containing viewer, selection, cache, sorting, parm7 virtualization, 2D depiction state, persistent NMR overlay payloads, and NMR filter state.
 
 ## `web/src/utils.js`
 - Role: UI utility helpers.
@@ -765,6 +797,9 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `decodeBase64(b64)`
     - `midpoint(posA, posB)`
     - `centroid(positions)`
+    - `distance(posA, posB)`
+    - `angleDegrees(posA, posB, posC)`
+    - `dihedralDegrees(posA, posB, posC, posD)`
 
 ## `web/src/viewer.js`
 - Role: 3Dmol/RDKit rendering, highlighting, labels, image export, interaction geometry helpers.
@@ -773,6 +808,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
   - Globals/Constants:
     - highlight CSS class ids, overlay constants.
     - residue-name driven biopolymer selector constants for default cartoon rendering.
+    - NMR overlay color/opacity/radius constants for per-kind line, plane, and marker rendering.
   - Exported Functions:
     - `requestRender()`
     - `applyTheme(isDark)`
@@ -792,7 +828,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
     - `renderInteractionLabels(interaction)`
     - `render2dModel(depiction, onAtomClick, onEmptyClick)`
     - `renderModel(pdbB64, onAtomClick, onEmptyClick)`
-  - Internal helpers include label builders, `applySplitStylePreset(preset)` using explicit protein/nucleic residue-name selection, 2D click target overlay, and empty-click selection handling.
+  - Internal helpers include label builders, `applySplitStylePreset(preset)` using explicit protein/nucleic residue-name selection, persistent NMR line/plane/marker overlay rendering with enlarged planes for visibility, per-kind filtering/color selection, `r2` reference label placement plus live coordinate-derived distance/angle/dihedral measurement labels rendered as `r0/r`, `θ0/θ`, or `φ0/φ`, 2D click target overlay, and empty-click selection handling.
 
 ## `web/src/ui.js`
 - Role: status, mode tabs, selection summary/details, about panel, and loading/UI config behavior.
@@ -869,7 +905,11 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - Functions:
     - `loadFromInputs()`
-    - `loadSystem(parm7Path, rst7Path, resname)`
+    - `loadSystem(parm7Path, rst7Path, resname, nmrPath)`
+    - `formatNmrSummary(summary)`
+    - `normalizeNmrFilter(value)`
+    - `resetNmrUiState()`
+    - `updateNmrFilterControl()`
     - `setInitialPaths(payload)`
     - `runFilter()`
     - `handleOpenDialog()`
@@ -885,6 +925,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - DOM anchors for mode tabs, viewer controls, info panel tabs/content, and parm7 sections/view.
   - Viewer style selector includes the default `Cartoon + sticks` option.
+  - Viewer visibility controls include a conditional NMR filter dropdown.
 
 ## `web/styles.css`
 - Role: visual theme/layout and interaction styles.
@@ -892,6 +933,7 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
 - Defines:
   - CSS variables for theme colors/mode highlights.
   - layout rules for panels/viewer/labels.
+  - styling for the conditional NMR filter dropdown in the viewer controls.
   - table/sort/highlight styles.
 
 ### Scripts and Tests
@@ -918,6 +960,18 @@ See `codebase-analysis-docs/assets/module-dependencies.mmd`.
   - Functions:
     - `test_parse_args_parm7_only_defaults_resname()`
     - `test_parse_args_resname_override()`
+    - `test_parse_args_nmr_override()`
+
+## `tests/test_nmr_restraints.py`
+- Role: validates Amber `&rst` parsing and atom-index validation.
+- Defines:
+  - Functions:
+    - `test_parse_nmr_restraints_example(tmp_path)`
+    - `test_parse_nmr_restraints_discards_trailing_zero_before_classification(tmp_path)`
+    - `test_parse_nmr_restraints_rejects_non_trailing_zero(tmp_path)`
+    - `test_nmr_restraint_to_dict_includes_equilibrium_value(tmp_path)`
+    - `test_parse_nmr_restraints_rejects_out_of_range_indices(tmp_path)`
+    - `test_parse_nmr_restraints_rejects_non_restraint_file(tmp_path)`
 
 ## `tests/test_improper_selection.py`
 - Role: validates improper sign semantics in selection index.

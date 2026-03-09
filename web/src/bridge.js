@@ -47,15 +47,19 @@ export function getInitialPaths() {
  * @param {string} parm7Path
  * @param {string=} rst7Path
  * @param {string=} resname
+ * @param {string=} nmrPath
  * @returns {Promise<any>}
  */
-export function loadSystem(parm7Path, rst7Path, resname) {
+export function loadSystem(parm7Path, rst7Path, resname, nmrPath) {
   const payload = { parm7_path: parm7Path };
   if (rst7Path) {
     payload.rst7_path = rst7Path;
   }
   if (resname) {
     payload.resname = resname;
+  }
+  if (nmrPath) {
+    payload.nmr_path = nmrPath;
   }
   return callApi("load_system", payload);
 }

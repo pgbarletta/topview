@@ -7,6 +7,7 @@ flowchart TD
     Query[topview/model/query.py]
     State[topview/model/state.py]
     Loader[topview/services/loader.py]
+    NMR[topview/services/nmr_restraints.py]
     Parm7[topview/services/parm7.py]
     LJ[topview/services/lj.py]
     SysInfo[topview/services/system_info.py]
@@ -31,6 +32,7 @@ flowchart TD
   Highlight --> Parm7
   Loader --> State
   Loader --> LJ
+  Loader --> NMR
   Loader --> Parm7
   Loader --> PDB
   SysInfo --> Parm7

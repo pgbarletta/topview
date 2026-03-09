@@ -6,7 +6,10 @@ import base64
 import logging
 from typing import Dict, Optional
 
-import webview
+try:
+    import webview
+except ModuleNotFoundError:  # pragma: no cover - exercised in test environments without GUI deps
+    webview = None
 
 from topview.errors import ModelError, error_result
 from topview.model import Model
@@ -40,6 +43,7 @@ class Api:
         worker: Worker,
         initial_paths: Optional[tuple[str, Optional[str]]] = None,
         initial_resname: Optional[str] = None,
+        initial_nmr_path: Optional[str] = None,
         ui_config: Optional[Dict[str, object]] = None,
     ) -> None:
         """Initialize the bridge API.
@@ -70,6 +74,7 @@ class Api:
         self._window = None
         self._initial_paths = initial_paths
         self._initial_resname = initial_resname
+        self._initial_nmr_path = initial_nmr_path
         self._ui_config = ui_config or {}
 
     def set_window(self, window) -> None:
@@ -108,17 +113,21 @@ class Api:
                 "parm7_path": None,
                 "rst7_path": None,
                 "resname": self._initial_resname,
+                "nmr_path": self._initial_nmr_path,
             }
         parm7_path, rst7_path = self._initial_paths
         initial_resname = self._initial_resname
+        initial_nmr_path = self._initial_nmr_path
         self._initial_paths = None
         self._initial_resname = None
+        self._initial_nmr_path = None
         logger.debug("get_initial_paths returned paths")
         return {
             "ok": True,
             "parm7_path": parm7_path,
             "rst7_path": rst7_path,
             "resname": initial_resname,
+            "nmr_path": initial_nmr_path,
         }
 
     def get_ui_config(self, payload: Optional[Dict[str, object]] = None):
@@ -156,13 +165,20 @@ class Api:
         parm7_path = payload.get("parm7_path") or None
         rst7_path = payload.get("rst7_path") or None
         resname = payload.get("resname")
+        nmr_path = payload.get("nmr_path") or None
         try:
-            logger.debug("load_system requested parm7=%s rst7=%s", parm7_path, rst7_path)
+            logger.debug(
+                "load_system requested parm7=%s rst7=%s nmr=%s",
+                parm7_path,
+                rst7_path,
+                nmr_path,
+            )
             future = self._worker.submit(
                 self._model.load_system,
                 parm7_path,
                 rst7_path,
                 resname,
+                nmr_path,
             )
             return future.result()
         except ModelError as exc:
@@ -424,6 +440,8 @@ class Api:
 
         if not self._window:
             return error_result("no_window", "Window is not available")
+        if webview is None:
+            return error_result("missing_dependency", "pywebview is not available")
         if not isinstance(payload, dict):
             return error_result("invalid_input", "payload must be an object")
         csv_text = payload.get("csv_text")
@@ -472,6 +490,8 @@ class Api:
 
         if not self._window:
             return error_result("no_window", "Window is not available")
+        if webview is None:
+            return error_result("missing_dependency", "pywebview is not available")
         if not isinstance(payload, dict):
             return error_result("invalid_input", "payload must be an object")
         data = payload.get("data")
@@ -565,6 +585,8 @@ class Api:
 
         if not self._window:
             return error_result("no_window", "Window is not available")
+        if webview is None:
+            return error_result("missing_dependency", "pywebview is not available")
         try:
             logger.debug("select_files dialog opened")
             parm7 = self._window.create_file_dialog(

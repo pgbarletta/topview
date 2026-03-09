@@ -420,6 +420,7 @@ body.dark-mode {
 
 .viewer-visibility-buttons button,
 .viewer-export-controls button,
+.viewer-visibility-select select,
 .viewer-export-controls select {
   font-size: 11px;
   padding: 4px 8px;
@@ -427,6 +428,22 @@ body.dark-mode {
   background: var(--button-bg);
   color: var(--text);
   border-radius: 4px;
+}
+
+.viewer-visibility-select {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.viewer-visibility-select select {
+  background: var(--input-bg);
+  color: var(--text);
+  min-inline-size: 116px;
 }
 
 .viewer-style-select {
