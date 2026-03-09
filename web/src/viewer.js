@@ -16,6 +16,62 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const EMPTY_CLICK_MOVE_PX = 6;
 const EMPTY_CLICK_MOVE_PX_SQ = EMPTY_CLICK_MOVE_PX * EMPTY_CLICK_MOVE_PX;
 const EMPTY_CLICK_HOLD_MS = 200;
+const PROTEIN_RESNAMES = [
+  "ALA",
+  "ARG",
+  "ASH",
+  "ASN",
+  "ASP",
+  "ACE",
+  "CYS",
+  "CYM",
+  "CYX",
+  "GLH",
+  "GLN",
+  "GLU",
+  "GLY",
+  "HID",
+  "HIE",
+  "HIP",
+  "HIS",
+  "HSD",
+  "HSE",
+  "HSP",
+  "ILE",
+  "LEU",
+  "LYN",
+  "LYS",
+  "MET",
+  "NME",
+  "PHE",
+  "PRO",
+  "SER",
+  "THR",
+  "TRP",
+  "TYR",
+  "VAL",
+];
+const NUCLEIC_RESNAMES = [
+  "A",
+  "C",
+  "G",
+  "U",
+  "DA",
+  "DC",
+  "DG",
+  "DT",
+  "DU",
+  "RA",
+  "RC",
+  "RG",
+  "RU",
+  "ADE",
+  "CYT",
+  "GUA",
+  "THY",
+  "URA",
+];
+const BIOPOLYMER_SELECTION = { resn: [...PROTEIN_RESNAMES, ...NUCLEIC_RESNAMES] };
 
 /**
  * Schedule a single viewer render on the next animation frame.
@@ -557,9 +613,8 @@ export function applyBaseStyle() {
   if (state.viewMode !== "3d" || !state.viewer) {
     return;
   }
-  if (state.currentStyleKey === "cartoon_ligand") {
-    state.viewer.setStyle({ protein: true }, STYLE_PRESETS.cartoon_ligand.protein);
-    state.viewer.setStyle({ not: { protein: true } }, STYLE_PRESETS.cartoon_ligand.other);
+  if (state.currentStyleKey === "cartoon_detail") {
+    applySplitStylePreset(STYLE_PRESETS.cartoon_detail);
     applyVisibilityFilters();
     return;
   }
@@ -580,9 +635,8 @@ export function applyStylePreset(key, renderNow = true) {
   if (state.viewMode !== "3d" || !state.viewer) {
     return;
   }
-  if (key === "cartoon_ligand") {
-    state.viewer.setStyle({ protein: true }, STYLE_PRESETS.cartoon_ligand.protein);
-    state.viewer.setStyle({ not: { protein: true } }, STYLE_PRESETS.cartoon_ligand.other);
+  if (key === "cartoon_detail") {
+    applySplitStylePreset(STYLE_PRESETS.cartoon_detail);
   } else {
     state.baseStyle = STYLE_PRESETS[key] || STYLE_PRESETS.sticks;
     state.viewer.setStyle({}, state.baseStyle);
@@ -594,10 +648,18 @@ export function applyStylePreset(key, renderNow = true) {
 }
 
 function getWaterStyle() {
-  if (state.currentStyleKey === "cartoon_ligand") {
-    return STYLE_PRESETS.cartoon_ligand.other;
+  if (state.currentStyleKey === "cartoon_detail") {
+    return STYLE_PRESETS.cartoon_detail.other;
   }
   return state.baseStyle || STYLE_PRESETS.sticks;
+}
+
+function applySplitStylePreset(preset) {
+  if (!state.viewer || !preset) {
+    return;
+  }
+  state.viewer.setStyle({}, preset.other);
+  state.viewer.setStyle(BIOPOLYMER_SELECTION, preset.biopolymer);
 }
 
 export function applyVisibilityFilters() {
