@@ -3,21 +3,6 @@ import { PARM7_FONT_MAX, PARM7_FONT_MIN, SECTION_MODE_MAP } from "./constants.js
 import { state } from "./state.js";
 import { escapeHtml } from "./utils.js";
 
-const PARM7_SECTION_PREFS = {
-  Atom: ["LENNARD_JONES_ACOEF", "HBOND_ACOEF"],
-  Bond: ["BOND_FORCE_CONSTANT", "BOND_EQUIL_VALUE"],
-  Angle: ["ANGLE_FORCE_CONSTANT", "ANGLE_EQUIL_VALUE"],
-  Dihedral: ["DIHEDRAL_FORCE_CONSTANT", "DIHEDRAL_PERIODICITY", "DIHEDRAL_PHASE"],
-  Improper: ["DIHEDRAL_FORCE_CONSTANT", "DIHEDRAL_PERIODICITY", "DIHEDRAL_PHASE"],
-  "1-4 Nonbonded": [
-    "LENNARD_JONES_ACOEF",
-    "HBOND_ACOEF",
-    "SCEE_SCALE_FACTOR",
-    "SCNB_SCALE_FACTOR",
-  ],
-  "Non-bonded": ["LENNARD_JONES_ACOEF", "HBOND_ACOEF"],
-};
-
 /**
  * Reset parm7 state and virtualization buffers.
  */
@@ -224,7 +209,7 @@ function renderParm7Line(viewIndex) {
   return { html: out || "&nbsp;", highlighted: true };
 }
 
-function renderParm7Window() {
+function renderParm7Window(force = false) {
   const view = document.getElementById("parm7-view");
   if (!view || !state.parm7LinesContainer) {
     return;
@@ -238,7 +223,8 @@ function renderParm7Window() {
     totalLines,
     Math.ceil((scrollTop + height) / state.parm7LineHeight) + buffer
   );
-  if (startIndex === state.parm7Window.start && endIndex === state.parm7Window.end) {
+  // Highlight updates can repaint the current visible window without scrolling.
+  if (!force && startIndex === state.parm7Window.start && endIndex === state.parm7Window.end) {
     return;
   }
   state.parm7Window = { start: startIndex, end: endIndex };
@@ -304,7 +290,7 @@ function applyParm7Highlights(highlights) {
       }
     }
   }
-  renderParm7Window();
+  renderParm7Window(true);
 }
 
 /**
@@ -366,47 +352,6 @@ function getSectionMode(name) {
   return SECTION_MODE_MAP[key] || null;
 }
 
-function getHighlightSections(highlights) {
-  const sections = new Set();
-  (highlights || []).forEach((hl) => {
-    if (hl && hl.section) {
-      sections.add(hl.section);
-    }
-  });
-  return sections;
-}
-
-function pickSectionName(mode, highlights) {
-  const sectionNames = getHighlightSections(highlights);
-  const preferred = PARM7_SECTION_PREFS[mode] || [];
-  for (const name of preferred) {
-    if (sectionNames.has(name)) {
-      return name;
-    }
-  }
-  const fallback = (highlights || []).find((hl) => hl && hl.section);
-  return fallback ? fallback.section : null;
-}
-
-/**
- * Auto-select a parm7 section for the current selection.
- * @param {string} mode
- * @param {Array<object>} highlights
- */
-export function autoSelectParm7Section(mode, highlights) {
-  if (!state.parm7Sections || !state.parm7Sections.length) {
-    return;
-  }
-  const sectionName = pickSectionName(mode, highlights);
-  if (!sectionName) {
-    return;
-  }
-  const section = state.parm7Sections.find((entry) => entry.name === sectionName);
-  if (section) {
-    setParm7SectionView(section);
-  }
-}
-
 /**
  * Fetch and apply parm7 highlights for a selection.
  * @param {Array<number>} serials
@@ -436,14 +381,13 @@ export function fetchParm7Highlights(serials, mode) {
   });
 }
 
-export function applyParm7SelectionHighlights(mode, highlights) {
+export function applyParm7SelectionHighlights(_mode, highlights) {
   if (!state.parm7Lines.length) {
     renderParm7File([]);
     return;
   }
   const safeHighlights = Array.isArray(highlights) ? highlights : [];
   state.parm7ActiveHighlights = safeHighlights;
-  autoSelectParm7Section(mode, safeHighlights);
   renderParm7File(safeHighlights);
 }
 
