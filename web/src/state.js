@@ -20,6 +20,7 @@ export const state = {
   parm7Lines: [],
   parm7Sections: [],
   parm7LineNodes: new Map(),
+  parm7ActiveHighlights: [],
   parm7HighlightsByLine: new Map(),
   parm7LinesContainer: null,
   parm7Spacer: null,

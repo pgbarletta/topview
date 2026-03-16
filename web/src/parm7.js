@@ -25,6 +25,7 @@ export function resetParm7State() {
   state.parm7Lines = [];
   state.parm7Sections = [];
   state.parm7LineNodes = new Map();
+  state.parm7ActiveHighlights = [];
   state.parm7HighlightsByLine = new Map();
   state.parm7LinesContainer = null;
   state.parm7Spacer = null;
@@ -75,6 +76,10 @@ export function setParm7SectionView(section) {
     }
   }
   buildParm7View();
+  if (state.parm7ActiveHighlights.length) {
+    applyParm7Highlights(state.parm7ActiveHighlights);
+    return;
+  }
   view.scrollTop = 0;
   renderParm7Window();
 }
@@ -151,6 +156,7 @@ export function renderParm7File(highlights) {
   if (!view) {
     return;
   }
+  state.parm7ActiveHighlights = Array.isArray(highlights) ? highlights : [];
   if (!state.parm7Lines.length) {
     view.textContent = "No parm7 loaded.";
     return;
@@ -158,7 +164,7 @@ export function renderParm7File(highlights) {
   if (!state.parm7LinesContainer) {
     buildParm7View();
   }
-  applyParm7Highlights(highlights || []);
+  applyParm7Highlights(state.parm7ActiveHighlights);
 }
 
 function buildParm7View() {
@@ -436,6 +442,7 @@ export function applyParm7SelectionHighlights(mode, highlights) {
     return;
   }
   const safeHighlights = Array.isArray(highlights) ? highlights : [];
+  state.parm7ActiveHighlights = safeHighlights;
   autoSelectParm7Section(mode, safeHighlights);
   renderParm7File(safeHighlights);
 }

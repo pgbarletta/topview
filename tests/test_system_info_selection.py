@@ -101,6 +101,7 @@ def test_system_info_selection_integration() -> None:
     columns = table["columns"]
     rows = table["rows"]
     assert rows
+    type_index_idx = columns.index("type_index")
     count_idx = columns.index("atom_count")
     row_index = None
     type_index = None
