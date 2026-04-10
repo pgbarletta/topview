@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from topview.model.state import Parm7Section
+from topview.config import CHARGE_SCALE
 from topview.services.parm7 import describe_section, parse_pointers
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ OPTIONAL_CONSUMED_FLOAT_SECTIONS = frozenset(
 
 def build_system_info_tables(
     sections: Dict[str, Parm7Section],
+    atom_charges: Optional[Sequence[float]] = None,
 ) -> Dict[str, Dict[str, object]]:
     """Build system info tables for the Info panel.
 
@@ -60,6 +62,18 @@ def build_system_info_tables(
     numang = _pointer_value(pointers, "NUMANG")
     nptra = _pointer_value(pointers, "NPTRA")
     nphb = _pointer_value(pointers, "NPHB")
+
+    if atom_charges is None:
+        charges = _parse_optional_float_section(sections, "CHARGE", natom) / CHARGE_SCALE
+    else:
+        charges = np.array(
+            [np.nan if charge is None else float(charge) for charge in atom_charges],
+            dtype=float,
+        )
+        if charges.size != natom:
+            raise ValueError(
+                f"CHARGE length {charges.size} does not match expected {natom}"
+            )
 
     atom_type_indices = _parse_int_section(
         sections, "ATOM_TYPE_INDEX", natom
@@ -106,6 +120,7 @@ def build_system_info_tables(
         nonbond_index,
         acoef,
         bcoef,
+        charges,
         ntypes,
     )
     bond_df = _build_bond_table(
@@ -193,6 +208,7 @@ def build_system_info_tables(
 
 def build_system_info_tables_with_timing(
     sections: Dict[str, Parm7Section],
+    atom_charges: Optional[Sequence[float]] = None,
 ) -> Tuple[Dict[str, Dict[str, object]], float]:
     """Build system info tables and return elapsed time.
 
@@ -208,7 +224,7 @@ def build_system_info_tables_with_timing(
     """
 
     start = time.perf_counter()
-    tables = build_system_info_tables(sections)
+    tables = build_system_info_tables(sections, atom_charges=atom_charges)
     return tables, time.perf_counter() - start
 
 
@@ -427,6 +443,7 @@ def _build_atom_type_table(
     nonbond_index: np.ndarray,
     acoef: np.ndarray,
     bcoef: np.ndarray,
+    charges: np.ndarray,
     ntypes: int,
 ) -> pd.DataFrame:
     type_indices = np.arange(1, ntypes + 1, dtype=int)
@@ -453,6 +470,19 @@ def _build_atom_type_table(
         .rename_axis("type_index")
         .reset_index(name="atom_count")
     )
+    charge_values = np.full(ntypes, np.nan, dtype=float)
+    if charges.size:
+        charge_df = pd.DataFrame(
+            {
+                "type_index": atom_type_indices.astype(int),
+                "charge": charges,
+            }
+        )
+        charge_means = charge_df.groupby("type_index", dropna=False)["charge"].mean()
+        for type_index, charge in charge_means.items():
+            idx = int(type_index) - 1
+            if 0 <= idx < ntypes:
+                charge_values[idx] = float(charge)
     names = pd.DataFrame(
         {
             "type_index": list(type_name_map.keys()),
@@ -465,6 +495,7 @@ def _build_atom_type_table(
             "pair_index": pair_index.astype(int),
             "acoef": acoef_diag,
             "bcoef": bcoef_diag,
+            "charge": charge_values,
             "rmin": rmin,
             "epsilon": epsilon,
         }

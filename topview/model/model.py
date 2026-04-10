@@ -230,11 +230,14 @@ class Model:
             nmr_path=nmr_path,
             cpu_submit=self._cpu_submit,
         )
+        atom_charges = [meta.parm7.get("charge") for meta in result.meta_list]
         info_future = None
         if self._cpu_submit:
             try:
                 info_future = self._cpu_submit(
-                    build_system_info_tables_with_timing, result.parm7_sections
+                    build_system_info_tables_with_timing,
+                    result.parm7_sections,
+                    atom_charges,
                 )
             except Exception:
                 logger.exception("Failed to schedule system info build")
@@ -417,7 +420,10 @@ class Model:
                 ) from exc
         else:
             try:
-                tables, elapsed = build_system_info_tables_with_timing(sections or {})
+                atom_charges = [meta.parm7.get("charge") for meta in self._state.meta_list]
+                tables, elapsed = build_system_info_tables_with_timing(
+                    sections or {}, atom_charges
+                )
             except ValueError as exc:
                 raise ModelError(
                     "parm7_parse_failed", "Failed to build system info tables", str(exc)

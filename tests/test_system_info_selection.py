@@ -1,4 +1,6 @@
 from pathlib import Path
+import math
+from typing import Optional
 
 from topview.model import Model
 from topview.model.state import Parm7Section, Parm7Token
@@ -30,6 +32,19 @@ def _make_pointer_section(overrides: dict[str, int]) -> Parm7Section:
     for idx, name in enumerate(POINTER_NAMES):
         values[idx] = overrides.get(name, 0)
     return _make_section("POINTERS", values)
+
+
+def _expected_type_charge(model: Model, type_index: int) -> Optional[float]:
+    with model._lock:
+        charges = [
+            atom.parm7.get("charge")
+            for atom in model._state.meta_list
+            if atom.parm7.get("atom_type_index") == type_index
+            and atom.parm7.get("charge") is not None
+        ]
+    if not charges:
+        return None
+    return sum(float(charge) for charge in charges) / len(charges)
 
 
 def test_selection_index_basic_mapping() -> None:
@@ -102,6 +117,7 @@ def test_system_info_selection_integration() -> None:
     rows = table["rows"]
     assert rows
     type_index_idx = columns.index("type_index")
+    charge_idx = columns.index("charge")
     count_idx = columns.index("atom_count")
     row_index = None
     type_index = None
@@ -118,6 +134,11 @@ def test_system_info_selection_integration() -> None:
     atom_info = model.get_atom_info(serial)
     assert atom_info["ok"]
     assert atom_info["atom"]["parm7"]["atom_type_index"] == type_index
+    expected_charge = _expected_type_charge(model, type_index)
+    assert expected_charge is not None
+    assert math.isclose(
+        float(rows[row_index][charge_idx]), expected_charge, rel_tol=1e-12, abs_tol=1e-12
+    )
 
 
 def test_system_info_selection_integration_without_optional_sections() -> None:
@@ -150,14 +171,18 @@ def test_system_info_selection_integration_without_optional_sections() -> None:
     rows = table["rows"]
     assert rows
     type_index_idx = columns.index("type_index")
+    charge_idx = columns.index("charge")
     count_idx = columns.index("atom_count")
     row_index = None
+    type_index = None
     for idx, row in enumerate(rows):
         count = row[count_idx]
         if count and int(count) > 0:
             row_index = idx
+            type_index = int(row[type_index_idx])
             break
     assert row_index is not None
+    assert type_index is not None
 
     selection = model.get_system_info_selection("atom_types", row_index, 0)
     assert selection["ok"]
@@ -165,6 +190,11 @@ def test_system_info_selection_integration_without_optional_sections() -> None:
     assert 1 <= serial <= natom
     atom_info = model.get_atom_info(serial)
     assert atom_info["ok"]
+    expected_charge = _expected_type_charge(model, type_index)
+    assert expected_charge is not None
+    assert math.isclose(
+        float(rows[row_index][charge_idx]), expected_charge, rel_tol=1e-12, abs_tol=1e-12
+    )
 
     dihedral_table = info["tables"]["dihedral_types"]
     if dihedral_table["rows"]:
