@@ -992,6 +992,7 @@ function highlightSerials2d(serials) {
 
 function refresh2dLabels() {
   clear2dLabels();
+  render2dChargeLabels();
   const selection = state.selectionSerials || [];
   if (!selection.length) {
     return;
@@ -1331,6 +1332,82 @@ function renderNmrRestraints() {
 
 function renderPersistentViewerOverlays() {
   renderNmrRestraints();
+  renderChargeLabels();
+}
+
+function renderChargeLabels() {
+  if (!state.showCharges) {
+    return;
+  }
+  if (state.viewMode === "2d") {
+    render2dChargeLabels();
+    return;
+  }
+  if (!state.viewer || !state.model) {
+    return;
+  }
+  const labelStyle = getLabelStyle();
+  const fontSize = getLabelFontSize();
+  state.chargesBySerial.forEach((charge, serial) => {
+    if (charge === null || charge === undefined) {
+      return;
+    }
+    const atoms = state.model.selectedAtoms({ serial: serial });
+    if (!atoms || !atoms.length) {
+      return;
+    }
+    const text = typeof charge === "number" ? charge.toFixed(4) : String(charge);
+    state.viewer.addLabel(text, {
+      position: atoms[0],
+      backgroundColor: labelStyle.backgroundColor,
+      fontColor: labelStyle.fontColor,
+      fontSize: Math.max(8, fontSize * 0.7),
+      screenOffset: { x: 0, y: 14 },
+    });
+  });
+}
+
+function render2dChargeLabels() {
+  if (!state.showCharges) {
+    return;
+  }
+  const serials = state.rdkitAtomSerials || [];
+  serials.forEach((serial) => {
+    const charge = state.chargesBySerial.get(String(serial));
+    if (charge === null || charge === undefined) {
+      return;
+    }
+    const atom = state.atomBySerial.get(serial);
+    if (!atom) {
+      return;
+    }
+    const pos = atomPosition(atom);
+    if (!pos) {
+      return;
+    }
+    const text = typeof charge === "number" ? charge.toFixed(4) : String(charge);
+    add2dLabel(text, { x: pos.x, y: pos.y + 14 });
+  });
+}
+
+export function refreshPersistentOverlays() {
+  if (state.viewMode === "2d") {
+    refresh2dLabels();
+    return;
+  }
+  if (!state.viewer) {
+    return;
+  }
+  state.viewer.removeAllLabels();
+  if (typeof state.viewer.removeAllShapes === "function") {
+    state.viewer.removeAllShapes();
+  }
+  renderPersistentViewerOverlays();
+  if (state.currentSelection && state.currentSelection.length > 0) {
+    highlightSerials(state.currentSelection);
+  } else {
+    requestRender();
+  }
 }
 
 function buildBondLabels(bonds) {

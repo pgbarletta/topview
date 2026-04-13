@@ -430,6 +430,12 @@ body.dark-mode {
   border-radius: 4px;
 }
 
+.viewer-visibility-buttons button.active-toggle {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
 .viewer-visibility-select {
   box-sizing: border-box;
   display: inline-flex;

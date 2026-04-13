@@ -7,6 +7,7 @@ import {
   loadSystem as apiLoadSystem,
   queryAtoms,
   selectFiles,
+  getAllCharges,
 } from "./bridge.js";
 import { resetParm7State, renderParm7File, renderParm7Sections } from "./parm7.js";
 import { selectAtom, clearSelection } from "./selection.js";
@@ -27,6 +28,7 @@ import {
   renderModel,
   render2dModel,
   resizeViewer,
+  refreshPersistentOverlays,
 } from "./viewer.js";
 import {
   applyUiConfig,
@@ -105,6 +107,9 @@ async function loadSystem(parm7Path, rst7Path, resname, nmrPath) {
   }
   clearSelection();
   state.atomCache = new Map();
+  state.showCharges = false;
+  state.chargesBySerial = new Map();
+  state.resname = resname || null;
   resetSystemInfoState();
   resetParm7State();
   const view = document.getElementById("parm7-view");
@@ -324,6 +329,11 @@ function updateVisibilityButtons() {
   if (hydrogenBtn) {
     hydrogenBtn.textContent = state.hideHydrogen ? "Show H (non-water)" : "Hide H (non-water)";
   }
+  const chargesBtn = document.getElementById("toggle-charges");
+  if (chargesBtn) {
+    chargesBtn.classList.toggle("active-toggle", state.showCharges);
+    chargesBtn.textContent = state.showCharges ? "Charges on" : "Charges";
+  }
   updateNmrFilterControl();
 }
 
@@ -348,6 +358,7 @@ function attachEvents() {
   const clearBtn = document.getElementById("clear-btn");
   const waterBtn = document.getElementById("toggle-water");
   const hydrogenBtn = document.getElementById("toggle-hydrogen");
+  const chargesBtn = document.getElementById("toggle-charges");
   const nmrFilter = document.getElementById("nmr-filter");
   const filterBtn = document.getElementById("filter-btn");
   const aboutBtn = document.getElementById("about-btn");
@@ -370,6 +381,24 @@ function attachEvents() {
       state.hideHydrogen = !state.hideHydrogen;
       updateVisibilityButtons();
       applyViewerStylePreset(state.currentStyleKey);
+    });
+  }
+  if (chargesBtn) {
+    chargesBtn.addEventListener("click", async () => {
+      if (!state.showCharges && state.chargesBySerial.size === 0) {
+        try {
+          const result = await getAllCharges(state.resname);
+          if (result && result.ok && result.charges) {
+            state.chargesBySerial = new Map(Object.entries(result.charges));
+          }
+        } catch (err) {
+          reportError(String(err));
+          return;
+        }
+      }
+      state.showCharges = !state.showCharges;
+      updateVisibilityButtons();
+      refreshPersistentOverlays();
     });
   }
   if (nmrFilter) {

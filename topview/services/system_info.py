@@ -5,26 +5,22 @@ from __future__ import annotations
 import logging
 import math
 import time
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
 
 from topview.model.state import Parm7Section
-from topview.config import CHARGE_SCALE
 from topview.services.parm7 import describe_section, parse_pointers
 
 logger = logging.getLogger(__name__)
 
 LJ_MIN_COEF = 1.0e-10
-OPTIONAL_CONSUMED_FLOAT_SECTIONS = frozenset(
-    {"SCEE_SCALE_FACTOR", "SCNB_SCALE_FACTOR"}
-)
+OPTIONAL_CONSUMED_FLOAT_SECTIONS = frozenset({"SCEE_SCALE_FACTOR", "SCNB_SCALE_FACTOR"})
 
 
 def build_system_info_tables(
     sections: Dict[str, Parm7Section],
-    atom_charges: Optional[Sequence[float]] = None,
 ) -> Dict[str, Dict[str, object]]:
     """Build system info tables for the Info panel.
 
@@ -63,25 +59,9 @@ def build_system_info_tables(
     nptra = _pointer_value(pointers, "NPTRA")
     nphb = _pointer_value(pointers, "NPHB")
 
-    if atom_charges is None:
-        charges = _parse_optional_float_section(sections, "CHARGE", natom) / CHARGE_SCALE
-    else:
-        charges = np.array(
-            [np.nan if charge is None else float(charge) for charge in atom_charges],
-            dtype=float,
-        )
-        if charges.size != natom:
-            raise ValueError(
-                f"CHARGE length {charges.size} does not match expected {natom}"
-            )
-
-    atom_type_indices = _parse_int_section(
-        sections, "ATOM_TYPE_INDEX", natom
-    )
+    atom_type_indices = _parse_int_section(sections, "ATOM_TYPE_INDEX", natom)
     atom_names = _parse_string_section(sections, "ATOM_NAME", natom)
-    amber_atom_types = _parse_string_section(
-        sections, "AMBER_ATOM_TYPE", natom
-    )
+    amber_atom_types = _parse_string_section(sections, "AMBER_ATOM_TYPE", natom)
     masses = _parse_float_section(sections, "MASS", natom)
     nonbond_index = _parse_int_section(
         sections, "NONBONDED_PARM_INDEX", ntypes * ntypes
@@ -99,19 +79,11 @@ def build_system_info_tables(
     bond_equil = _parse_float_section(sections, "BOND_EQUIL_VALUE", numbnd)
     angle_force = _parse_float_section(sections, "ANGLE_FORCE_CONSTANT", numang)
     angle_equil = _parse_float_section(sections, "ANGLE_EQUIL_VALUE", numang)
-    dihedral_force = _parse_float_section(
-        sections, "DIHEDRAL_FORCE_CONSTANT", nptra
-    )
-    dihedral_periodicity = _parse_float_section(
-        sections, "DIHEDRAL_PERIODICITY", nptra
-    )
+    dihedral_force = _parse_float_section(sections, "DIHEDRAL_FORCE_CONSTANT", nptra)
+    dihedral_periodicity = _parse_float_section(sections, "DIHEDRAL_PERIODICITY", nptra)
     dihedral_phase = _parse_float_section(sections, "DIHEDRAL_PHASE", nptra)
-    scee_scale = _parse_optional_float_section(
-        sections, "SCEE_SCALE_FACTOR", nptra
-    )
-    scnb_scale = _parse_optional_float_section(
-        sections, "SCNB_SCALE_FACTOR", nptra
-    )
+    scee_scale = _parse_optional_float_section(sections, "SCEE_SCALE_FACTOR", nptra)
+    scnb_scale = _parse_optional_float_section(sections, "SCNB_SCALE_FACTOR", nptra)
 
     type_name_map = _build_type_name_map(atom_type_indices, amber_atom_types, ntypes)
     atom_types_df = _build_atom_type_table(
@@ -120,7 +92,6 @@ def build_system_info_tables(
         nonbond_index,
         acoef,
         bcoef,
-        charges,
         ntypes,
     )
     bond_df = _build_bond_table(
@@ -208,7 +179,6 @@ def build_system_info_tables(
 
 def build_system_info_tables_with_timing(
     sections: Dict[str, Parm7Section],
-    atom_charges: Optional[Sequence[float]] = None,
 ) -> Tuple[Dict[str, Dict[str, object]], float]:
     """Build system info tables and return elapsed time.
 
@@ -224,7 +194,7 @@ def build_system_info_tables_with_timing(
     """
 
     start = time.perf_counter()
-    tables = build_system_info_tables(sections, atom_charges=atom_charges)
+    tables = build_system_info_tables(sections)
     return tables, time.perf_counter() - start
 
 
@@ -283,9 +253,7 @@ def _parse_int_section(
             expected,
             describe_section(section),
         )
-        raise ValueError(
-            f"{name} parsed {values.size} values but expected {expected}"
-        )
+        raise ValueError(f"{name} parsed {values.size} values but expected {expected}")
     return values
 
 
@@ -337,9 +305,7 @@ def _parse_float_section(
             expected,
             describe_section(section),
         )
-        raise ValueError(
-            f"{name} parsed {values.size} values but expected {expected}"
-        )
+        raise ValueError(f"{name} parsed {values.size} values but expected {expected}")
     return values
 
 
@@ -427,9 +393,8 @@ def _build_type_name_map(
             "amber_type": amber_atom_types,
         }
     )
-    grouped = (
-        df.groupby("type_index", dropna=False)["amber_type"]
-        .apply(lambda series: ", ".join(sorted({value for value in series if value})))
+    grouped = df.groupby("type_index", dropna=False)["amber_type"].apply(
+        lambda series: ", ".join(sorted({value for value in series if value}))
     )
     name_map = {int(idx): str(val) for idx, val in grouped.items()}
     for type_index in range(1, ntypes + 1):
@@ -443,7 +408,6 @@ def _build_atom_type_table(
     nonbond_index: np.ndarray,
     acoef: np.ndarray,
     bcoef: np.ndarray,
-    charges: np.ndarray,
     ntypes: int,
 ) -> pd.DataFrame:
     type_indices = np.arange(1, ntypes + 1, dtype=int)
@@ -453,7 +417,9 @@ def _build_atom_type_table(
     pair_index[valid_offsets] = nonbond_index[diag_offsets[valid_offsets]]
     acoef_diag = np.full(ntypes, np.nan, dtype=float)
     bcoef_diag = np.full(ntypes, np.nan, dtype=float)
-    positive = (pair_index > 0) & (pair_index <= acoef.size) & (pair_index <= bcoef.size)
+    positive = (
+        (pair_index > 0) & (pair_index <= acoef.size) & (pair_index <= bcoef.size)
+    )
     acoef_diag[positive] = acoef[pair_index[positive] - 1]
     bcoef_diag[positive] = bcoef[pair_index[positive] - 1]
     rmin = np.zeros(ntypes, dtype=float)
@@ -470,19 +436,6 @@ def _build_atom_type_table(
         .rename_axis("type_index")
         .reset_index(name="atom_count")
     )
-    charge_values = np.full(ntypes, np.nan, dtype=float)
-    if charges.size:
-        charge_df = pd.DataFrame(
-            {
-                "type_index": atom_type_indices.astype(int),
-                "charge": charges,
-            }
-        )
-        charge_means = charge_df.groupby("type_index", dropna=False)["charge"].mean()
-        for type_index, charge in charge_means.items():
-            idx = int(type_index) - 1
-            if 0 <= idx < ntypes:
-                charge_values[idx] = float(charge)
     names = pd.DataFrame(
         {
             "type_index": list(type_name_map.keys()),
@@ -495,7 +448,6 @@ def _build_atom_type_table(
             "pair_index": pair_index.astype(int),
             "acoef": acoef_diag,
             "bcoef": bcoef_diag,
-            "charge": charge_values,
             "rmin": rmin,
             "epsilon": epsilon,
         }
@@ -656,12 +608,8 @@ def _build_rotatable_bonds(
             atom_k = int(row[2])
             atom_l = int(row[3])
             central_bonds.add(_sorted_pair(atom_j, atom_k))
-            terminal_triplets.setdefault(atom_i, []).append(
-                (atom_j, atom_k, atom_l)
-            )
-            terminal_triplets.setdefault(atom_l, []).append(
-                (atom_i, atom_j, atom_k)
-            )
+            terminal_triplets.setdefault(atom_i, []).append((atom_j, atom_k, atom_l))
+            terminal_triplets.setdefault(atom_l, []).append((atom_i, atom_j, atom_k))
 
     rotatable: Set[Tuple[int, int]] = set()
     for atom_a, atom_b in heavy_bonds:
@@ -807,7 +755,9 @@ def _build_dihedral_table(
             atom_j = int(atom_serials[idx, 1])
             atom_k = int(atom_serials[idx, 2])
             atom_l = int(atom_serials[idx, 3])
-            entries.append((atom_i, atom_j, atom_k, atom_l, int(param_index[idx]), term_idx))
+            entries.append(
+                (atom_i, atom_j, atom_k, atom_l, int(param_index[idx]), term_idx)
+            )
             term_idx += 1
     if not entries:
         return _empty_table(
@@ -844,7 +794,9 @@ def _build_dihedral_table(
         if key not in id_by_ijkl:
             id_by_ijkl[key] = next_id
             next_id += 1
-        name_i, name_j, name_k, name_l = _lookup_ijkl_labels(atom_names, atom_i, atom_j, atom_k, atom_l)
+        name_i, name_j, name_k, name_l = _lookup_ijkl_labels(
+            atom_names, atom_i, atom_j, atom_k, atom_l
+        )
         type_i, type_j, type_k, type_l = _lookup_ijkl_labels(
             amber_atom_types, atom_i, atom_j, atom_k, atom_l
         )
@@ -1188,8 +1140,6 @@ def _sorted_pair(a: int, b: int) -> Tuple[int, int]:
     return (a, b) if a <= b else (b, a)
 
 
-
-
 def _lookup_pair_values(
     pair_index: np.ndarray,
     acoef: np.ndarray,
@@ -1278,7 +1228,9 @@ def _empty_table(columns: Iterable[str]) -> pd.DataFrame:
 def _df_to_table(df: pd.DataFrame) -> Dict[str, object]:
     safe = df.where(pd.notnull(df), None)
     columns = [str(col) for col in safe.columns]
-    rows = [[_to_native(value) for value in row] for row in safe.itertuples(index=False)]
+    rows = [
+        [_to_native(value) for value in row] for row in safe.itertuples(index=False)
+    ]
     return {"columns": columns, "rows": rows}
 
 

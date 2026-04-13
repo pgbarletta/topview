@@ -8,7 +8,9 @@ from typing import Dict, Optional
 
 try:
     import webview
-except ModuleNotFoundError:  # pragma: no cover - exercised in test environments without GUI deps
+except (
+    ModuleNotFoundError
+):  # pragma: no cover - exercised in test environments without GUI deps
     webview = None
 
 from topview.errors import ModelError, error_result
@@ -217,6 +219,33 @@ class Api:
             logger.exception("get_atom_info unexpected error")
             return error_result("unexpected", "Unexpected error", str(exc))
 
+    def get_all_charges(self, payload: Optional[Dict[str, object]] = None):
+        """Return per-atom charges for all atoms, optionally filtered by residue name.
+
+        Parameters
+        ----------
+        payload
+            Optional payload containing resname filter.
+
+        Returns
+        -------
+        dict
+            Payload mapping serial (str) to charge (float or None).
+        """
+
+        resname = None
+        if isinstance(payload, dict):
+            resname = payload.get("resname") or None
+        try:
+            logger.debug("get_all_charges requested resname=%s", resname)
+            return self._model.get_all_charges(resname)
+        except ModelError as exc:
+            logger.exception("get_all_charges failed")
+            return exc.to_result()
+        except Exception as exc:
+            logger.exception("get_all_charges unexpected error")
+            return error_result("unexpected", "Unexpected error", str(exc))
+
     def get_atom_bundle(self, payload: Dict[str, object]):
         """Return atom metadata plus parm7 highlights.
 
@@ -401,11 +430,11 @@ class Api:
             row_idx = int(row_index)
             cursor_idx = int(cursor)
         except (TypeError, ValueError):
-            return error_result("invalid_input", "row_index and cursor must be integers")
-        if row_idx < 0 or cursor_idx < 0:
             return error_result(
-                "invalid_input", "row_index and cursor must be >= 0"
+                "invalid_input", "row_index and cursor must be integers"
             )
+        if row_idx < 0 or cursor_idx < 0:
+            return error_result("invalid_input", "row_index and cursor must be >= 0")
         try:
             logger.debug(
                 "get_system_info_selection table=%s row=%s cursor=%s",

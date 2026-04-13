@@ -193,6 +193,31 @@ class Model:
         highlights, _ = engine.get_highlights([meta.serial], mode="Atom")
         return {"ok": True, "atom": meta.to_dict(), "highlights": highlights}
 
+    def get_all_charges(self, resname: Optional[str] = None) -> Dict[str, object]:
+        """Return per-atom charges, optionally filtered by residue name.
+
+        Parameters
+        ----------
+        resname
+            If provided, only return charges for atoms in residues with this name.
+
+        Returns
+        -------
+        dict
+            Mapping of serial (str) to charge (float or None).
+        """
+
+        with self._lock:
+            if not self._state.loaded:
+                raise ModelError("not_loaded", "No system loaded")
+            charges = {}
+            for meta in self._state.meta_list:
+                if resname and meta.residue.resname != resname:
+                    continue
+                charge = meta.parm7.get("charge")
+                charges[str(meta.serial)] = charge
+        return {"ok": True, "charges": charges}
+
     def load_system(
         self,
         parm7_path: str,
@@ -230,14 +255,11 @@ class Model:
             nmr_path=nmr_path,
             cpu_submit=self._cpu_submit,
         )
-        atom_charges = [meta.parm7.get("charge") for meta in result.meta_list]
         info_future = None
         if self._cpu_submit:
             try:
-                info_future = self._cpu_submit(
-                    build_system_info_tables_with_timing,
-                    result.parm7_sections,
-                    atom_charges,
+                tables, elapsed = build_system_info_tables_with_timing(
+                    sections or {},
                 )
             except Exception:
                 logger.exception("Failed to schedule system info build")
@@ -420,9 +442,8 @@ class Model:
                 ) from exc
         else:
             try:
-                atom_charges = [meta.parm7.get("charge") for meta in self._state.meta_list]
                 tables, elapsed = build_system_info_tables_with_timing(
-                    sections or {}, atom_charges
+                    sections or {},
                 )
             except ValueError as exc:
                 raise ModelError(
@@ -533,16 +554,12 @@ class Model:
 
         if table == "bond_types":
             key = _bond_key(row_map)
-            selections = (
-                selection_index.bonds_by_key.get(key, []) if key else []
-            )
+            selections = selection_index.bonds_by_key.get(key, []) if key else []
             return _selection_result(mode, selections, cursor_idx)
 
         if table == "angle_types":
             key = _angle_key(row_map)
-            selections = (
-                selection_index.angles_by_key.get(key, []) if key else []
-            )
+            selections = selection_index.angles_by_key.get(key, []) if key else []
             return _selection_result(mode, selections, cursor_idx)
 
         if table == "dihedral_types":
@@ -577,9 +594,7 @@ class Model:
 
         if table == "one_four_nonbonded":
             key = _bond_key(row_map)
-            selections = (
-                selection_index.one_four_by_key.get(key, []) if key else []
-            )
+            selections = selection_index.one_four_by_key.get(key, []) if key else []
             return _selection_result(mode, selections, cursor_idx)
 
         if table == "nonbonded_pairs":

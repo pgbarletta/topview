@@ -113,6 +113,15 @@ export function saveViewerImage(data, format, name) {
 }
 
 /**
+ * @param {string|null} resname
+ * @returns {Promise<any>}
+ */
+export function getAllCharges(resname) {
+  const payload = resname ? { resname: resname } : {};
+  return callApi("get_all_charges", payload);
+}
+
+/**
  * @param {number} serial
  * @returns {Promise<any>}
  */

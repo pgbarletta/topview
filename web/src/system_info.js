@@ -26,7 +26,6 @@ const HIGHLIGHT_COLORS = {
 const SORTABLE_COLUMNS = {
   atom_types: [
     "type_index",
-    "charge",
     "atom_count",
     "pair_index",
     "acoef",
