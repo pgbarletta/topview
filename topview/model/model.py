@@ -258,8 +258,9 @@ class Model:
         info_future = None
         if self._cpu_submit:
             try:
-                tables, elapsed = build_system_info_tables_with_timing(
-                    sections or {},
+                info_future = self._cpu_submit(
+                    build_system_info_tables_with_timing,
+                    result.parm7_sections,
                 )
             except Exception:
                 logger.exception("Failed to schedule system info build")
