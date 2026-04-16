@@ -100,17 +100,68 @@ def test_bond_order_inference_from_amber_types() -> None:
     assert _infer_bond_order_from_atom_types("o", "ce") == 2
     assert _infer_bond_order_from_atom_types("ca", "ca") == 4
     assert _infer_bond_order_from_atom_types("ca", "cp") == 4
-    assert _infer_bond_order_from_atom_types("cd", "nc") == 2
-    assert _infer_bond_order_from_atom_types("c3", "os") == 1
+    assert _infer_bond_order_from_atom_types("cd", "nc") == 4
+    assert _infer_bond_order_from_atom_types("c3", "os") is None
     assert _infer_bond_order_from_atom_types("unk", "unk2") is None
     assert _infer_bond_order_from_atom_types(None, "o") is None
     assert _infer_bond_order_from_atom_types("", "o") is None
+
+
+def test_bond_order_inference_gaff2_coverage() -> None:
+    assert _infer_bond_order_from_atom_types("c1", "c1") == 3
+    assert _infer_bond_order_from_atom_types("c1", "n1") == 3
+    assert _infer_bond_order_from_atom_types("n1", "n1") == 3
+    assert _infer_bond_order_from_atom_types("cg", "n1") == 3
+    assert _infer_bond_order_from_atom_types("ch", "n1") == 3
+    assert _infer_bond_order_from_atom_types("c1", "cg") == 2
+    assert _infer_bond_order_from_atom_types("c1", "o") == 2
+    assert _infer_bond_order_from_atom_types("c2", "o") == 2
+    assert _infer_bond_order_from_atom_types("cs", "o") == 2
+    assert _infer_bond_order_from_atom_types("c2", "s") == 2
+    assert _infer_bond_order_from_atom_types("cs", "s") == 2
+    assert _infer_bond_order_from_atom_types("c2", "n2") == 2
+    assert _infer_bond_order_from_atom_types("cc", "nc") == 4
+    assert _infer_bond_order_from_atom_types("n2", "n2") == 2
+    assert _infer_bond_order_from_atom_types("nc", "nc") == 4
+    assert _infer_bond_order_from_atom_types("cz", "na") == 2
+    assert _infer_bond_order_from_atom_types("cc", "cc") == 4
+    assert _infer_bond_order_from_atom_types("cd", "nb") == 4
+    assert _infer_bond_order_from_atom_types("nb", "nc") == 4
+    assert _infer_bond_order_from_atom_types("n2", "s") == 2
+    assert _infer_bond_order_from_atom_types("ne", "s") == 2
+    assert _infer_bond_order_from_atom_types("n1", "s") == 2
+    # nf/ne/ce/cf aromatic bonds
+    assert _infer_bond_order_from_atom_types("cd", "nf") == 4
+    assert _infer_bond_order_from_atom_types("ce", "nf") == 4
+    assert _infer_bond_order_from_atom_types("ca", "nf") == 4
+    assert _infer_bond_order_from_atom_types("cd", "ne") == 4
+    assert _infer_bond_order_from_atom_types("ce", "ne") == 4
+    assert _infer_bond_order_from_atom_types("ca", "ne") == 4
+    assert _infer_bond_order_from_atom_types("ca", "ce") == 4
+    assert _infer_bond_order_from_atom_types("ca", "cf") == 4
+    assert _infer_bond_order_from_atom_types("ce", "ce") == 4
+    assert _infer_bond_order_from_atom_types("cf", "cf") == 4
+    assert _infer_bond_order_from_atom_types("ce", "nc") == 4
+    assert _infer_bond_order_from_atom_types("ne", "ne") == 4
+    assert _infer_bond_order_from_atom_types("nf", "nf") == 4
+    assert _infer_bond_order_from_atom_types("nb", "ne") == 4
+    assert _infer_bond_order_from_atom_types("nb", "nf") == 4
+    # nf/ne still double with non-aromatic types
+    assert _infer_bond_order_from_atom_types("c1", "nf") == 2
+    assert _infer_bond_order_from_atom_types("c2", "nf") == 2
+    assert _infer_bond_order_from_atom_types("c1", "ne") == 2
+    assert _infer_bond_order_from_atom_types("c2", "ne") == 2
+    assert _infer_bond_order_from_atom_types("nf", "s") == 2
+    assert _infer_bond_order_from_atom_types("ne", "s") == 2
 
 
 def test_bond_order_inference_from_req() -> None:
     assert _infer_bond_order_from_req("C", "O", 1.20) == 2
     assert _infer_bond_order_from_req("O", "C", 1.20) == 2
     assert _infer_bond_order_from_req("C", "N", 1.30) == 2
+    assert _infer_bond_order_from_req("C", "S", 1.55) == 2
+    assert _infer_bond_order_from_req("S", "C", 1.55) == 2
+    assert _infer_bond_order_from_req("N", "S", 1.50) == 2
     assert _infer_bond_order_from_req("C", "O", 1.30) is None
     assert _infer_bond_order_from_req("C", "O", None) is None
     assert _infer_bond_order_from_req(None, "O", 1.20) is None
