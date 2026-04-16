@@ -18,11 +18,118 @@ from topview.config import CHARGE_SCALE, DEFAULT_RESNAME
 from topview.errors import ModelError
 from topview.model.state import AtomMeta, Parm7Section, ResidueMeta
 from topview.services.lj import compute_lj_tables
-from topview.services.nmr_restraints import parse_nmr_restraints, summarize_nmr_restraints
+from topview.services.nmr_restraints import (
+    parse_nmr_restraints,
+    summarize_nmr_restraints,
+)
 from topview.services.parm7 import describe_section, parse_parm7, parse_pointers
 from topview.services.pdb_writer import write_pdb
 
 logger = logging.getLogger(__name__)
+
+_BOND_ORDER_SINGLE = 1
+_BOND_ORDER_DOUBLE = 2
+_BOND_ORDER_TRIPLE = 3
+_BOND_ORDER_AROMATIC = 4
+
+_AMBER_TYPE_PAIR_BOND_ORDER: Dict[Tuple[str, str], int] = {
+    ("c", "o"): _BOND_ORDER_DOUBLE,
+    ("c", "o*"): _BOND_ORDER_DOUBLE,
+    ("c2", "o"): _BOND_ORDER_DOUBLE,
+    ("c2", "o2"): _BOND_ORDER_DOUBLE,
+    ("c2", "oh"): _BOND_ORDER_DOUBLE,
+    ("cd", "o"): _BOND_ORDER_DOUBLE,
+    ("cd", "os"): _BOND_ORDER_SINGLE,
+    ("ce", "o"): _BOND_ORDER_DOUBLE,
+    ("cf", "o"): _BOND_ORDER_DOUBLE,
+    ("cg", "o"): _BOND_ORDER_DOUBLE,
+    ("cc", "cd"): _BOND_ORDER_DOUBLE,
+    ("cc", "c"): _BOND_ORDER_DOUBLE,
+    ("cd", "nb"): _BOND_ORDER_DOUBLE,
+    ("cd", "nc"): _BOND_ORDER_DOUBLE,
+    ("cd", "na"): _BOND_ORDER_DOUBLE,
+    ("ce", "nf"): _BOND_ORDER_DOUBLE,
+    ("cf", "nc"): _BOND_ORDER_DOUBLE,
+    ("c", "n"): _BOND_ORDER_DOUBLE,
+    ("c2", "n"): _BOND_ORDER_DOUBLE,
+    ("ca", "ca"): _BOND_ORDER_AROMATIC,
+    ("ca", "cp"): _BOND_ORDER_AROMATIC,
+    ("ca", "cq"): _BOND_ORDER_AROMATIC,
+    ("ca", "cc"): _BOND_ORDER_AROMATIC,
+    ("ca", "cv"): _BOND_ORDER_AROMATIC,
+    ("ca", "cw"): _BOND_ORDER_AROMATIC,
+    ("ca", "cx"): _BOND_ORDER_AROMATIC,
+    ("ca", "cb"): _BOND_ORDER_AROMATIC,
+    ("ca", "nb"): _BOND_ORDER_AROMATIC,
+    ("ca", "nc"): _BOND_ORDER_AROMATIC,
+    ("cp", "cp"): _BOND_ORDER_AROMATIC,
+    ("cp", "cq"): _BOND_ORDER_AROMATIC,
+    ("cp", "nb"): _BOND_ORDER_AROMATIC,
+    ("cq", "cq"): _BOND_ORDER_AROMATIC,
+    ("cq", "nb"): _BOND_ORDER_AROMATIC,
+    ("cv", "cv"): _BOND_ORDER_AROMATIC,
+    ("cw", "cw"): _BOND_ORDER_AROMATIC,
+    ("cc", "cd"): _BOND_ORDER_DOUBLE,
+    ("cc", "nb"): _BOND_ORDER_AROMATIC,
+    ("n", "c"): _BOND_ORDER_DOUBLE,
+    ("nb", "ca"): _BOND_ORDER_AROMATIC,
+    ("nb", "cp"): _BOND_ORDER_AROMATIC,
+    ("nb", "cq"): _BOND_ORDER_AROMATIC,
+    ("nc", "ca"): _BOND_ORDER_AROMATIC,
+    ("nc", "cd"): _BOND_ORDER_DOUBLE,
+    ("nc", "nc"): _BOND_ORDER_DOUBLE,
+    ("na", "c"): _BOND_ORDER_DOUBLE,
+    ("na", "na"): _BOND_ORDER_DOUBLE,
+    ("nh", "c"): _BOND_ORDER_DOUBLE,
+    ("oh", "c2"): _BOND_ORDER_DOUBLE,
+    ("o", "c"): _BOND_ORDER_DOUBLE,
+    ("o", "c2"): _BOND_ORDER_DOUBLE,
+    ("o", "cd"): _BOND_ORDER_DOUBLE,
+    ("o", "ce"): _BOND_ORDER_DOUBLE,
+    ("o", "cf"): _BOND_ORDER_DOUBLE,
+    ("o", "cg"): _BOND_ORDER_DOUBLE,
+    ("o*", "c"): _BOND_ORDER_DOUBLE,
+    ("os", "cd"): _BOND_ORDER_SINGLE,
+    ("os", "c3"): _BOND_ORDER_SINGLE,
+    ("os", "ca"): _BOND_ORDER_SINGLE,
+    ("nf", "ce"): _BOND_ORDER_DOUBLE,
+}
+
+_REQ_DOUBLE_BOND_THRESHOLDS: Dict[Tuple[str, str], float] = {
+    ("C", "O"): 1.28,
+    ("O", "C"): 1.28,
+    ("C", "N"): 1.32,
+    ("N", "C"): 1.32,
+    ("C", "C"): 1.38,
+    ("N", "N"): 1.24,
+}
+
+
+def _infer_bond_order_from_atom_types(
+    type_a: Optional[str],
+    type_b: Optional[str],
+) -> Optional[int]:
+    if not type_a or not type_b:
+        return None
+    key = (type_a.strip().lower(), type_b.strip().lower())
+    result = _AMBER_TYPE_PAIR_BOND_ORDER.get(key)
+    if result is not None:
+        return result
+    rev = (key[1], key[0])
+    return _AMBER_TYPE_PAIR_BOND_ORDER.get(rev)
+
+
+def _infer_bond_order_from_req(
+    elem_a: Optional[str],
+    elem_b: Optional[str],
+    req: Optional[float],
+) -> Optional[int]:
+    if req is None or not elem_a or not elem_b:
+        return None
+    threshold = _REQ_DOUBLE_BOND_THRESHOLDS.get((elem_a, elem_b))
+    if threshold is not None and req < threshold:
+        return _BOND_ORDER_DOUBLE
+    return None
 
 
 @dataclass(frozen=True)
@@ -259,23 +366,31 @@ def _build_rdkit_depiction(
     atom_serials: List[int] = []
     atom_names: List[str] = []
 
+    atom_types_by_serial: Dict[int, str] = {}
+    atom_elements_by_serial: Dict[int, str] = {}
+
     for atom in atoms:
         serial = int(getattr(atom, "idx", 0)) + 1
         name = str(getattr(atom, "name", "") or "").strip()
         atomic_number = getattr(atom, "atomic_number", None)
-        if not atomic_number:
-            element = getattr(atom, "element", None)
-            element_symbol = (
-                str(element).strip() if element else _guess_element(name) or ""
-            )
+        element = getattr(atom, "element", None)
+        element_symbol = str(element).strip() if element else _guess_element(name) or ""
+        if not atomic_number and element_symbol:
             atomic_number = (
                 periodic.GetAtomicNumber(element_symbol) if element_symbol else 0
             )
         rd_atom = Chem.Atom(int(atomic_number)) if atomic_number else Chem.Atom(0)
+        rd_atom.SetNoImplicit(True)
+        rd_atom.SetNumExplicitHs(0)
         rd_idx = rw_mol.AddAtom(rd_atom)
         atom_idx_by_serial[serial] = rd_idx
         atom_serials.append(serial)
         atom_names.append(name)
+        amber_type = str(getattr(atom, "type", "") or "").strip().lower()
+        if amber_type:
+            atom_types_by_serial[serial] = amber_type
+        if element_symbol:
+            atom_elements_by_serial[serial] = element_symbol
 
     bond_entries: List[object] = []
     residue_bonds = getattr(residue, "bonds", None)
@@ -305,16 +420,39 @@ def _build_rdkit_depiction(
             continue
         bond_type = Chem.rdchem.BondType.SINGLE
         order = getattr(bond, "order", None)
+        order_val = None
         if order is not None:
             try:
                 order_val = float(order)
             except (TypeError, ValueError):
                 order_val = None
+        if order_val is not None and order_val != 1.0:
             if order_val == 2:
                 bond_type = Chem.rdchem.BondType.DOUBLE
             elif order_val == 3:
                 bond_type = Chem.rdchem.BondType.TRIPLE
-            elif order_val and abs(order_val - 1.5) < 0.1:
+            elif abs(order_val - 1.5) < 0.1:
+                bond_type = Chem.rdchem.BondType.AROMATIC
+        else:
+            inferred = _infer_bond_order_from_atom_types(
+                atom_types_by_serial.get(serial_a),
+                atom_types_by_serial.get(serial_b),
+            )
+            if inferred is None:
+                req = None
+                bond_ff_type = getattr(bond, "type", None)
+                if bond_ff_type is not None:
+                    req = getattr(bond_ff_type, "req", None)
+                inferred = _infer_bond_order_from_req(
+                    atom_elements_by_serial.get(serial_a),
+                    atom_elements_by_serial.get(serial_b),
+                    req,
+                )
+            if inferred == _BOND_ORDER_DOUBLE:
+                bond_type = Chem.rdchem.BondType.DOUBLE
+            elif inferred == _BOND_ORDER_TRIPLE:
+                bond_type = Chem.rdchem.BondType.TRIPLE
+            elif inferred == _BOND_ORDER_AROMATIC:
                 bond_type = Chem.rdchem.BondType.AROMATIC
         rw_mol.AddBond(idx_a, idx_b, bond_type)
 
