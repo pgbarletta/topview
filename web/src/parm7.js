@@ -1,4 +1,4 @@
-import { getParm7Highlights } from "./bridge.js";
+import { getParm7Highlights, getParm7Pointers } from "./bridge.js";
 import { PARM7_FONT_MAX, PARM7_FONT_MIN, SECTION_MODE_MAP } from "./constants.js";
 import { state } from "./state.js";
 import { escapeHtml } from "./utils.js";
@@ -43,6 +43,10 @@ export function setParm7SectionView(section) {
   const view = document.getElementById("parm7-view");
   if (!view) {
     return;
+  }
+  const btn = document.getElementById("parm7-pointers-btn");
+  if (btn) {
+    btn.classList.remove("active-toggle");
   }
   if (!section) {
     state.parm7ViewIndices = null;
@@ -400,4 +404,42 @@ export function updateParm7Highlights(serials, mode) {
     applyParm7SelectionHighlights(mode, result.highlights || []);
     return result.interaction || null;
   });
+}
+
+export function showPointersTable() {
+  const view = document.getElementById("parm7-view");
+  const btn = document.getElementById("parm7-pointers-btn");
+  if (!view) {
+    return;
+  }
+  if (btn) {
+    btn.classList.add("active-toggle");
+  }
+  view.innerHTML = "<div>Loading POINTERS...</div>";
+  getParm7Pointers()
+    .then((result) => {
+      if (!result || !result.ok) {
+        const msg = result && result.error ? result.error.message : "Failed to load POINTERS";
+        view.innerHTML = `<div>${escapeHtml(msg)}</div>`;
+        return;
+      }
+      const pointers = result.pointers || [];
+      if (!pointers.length) {
+        view.innerHTML = "<div>No POINTERS data available.</div>";
+        return;
+      }
+      const headerHtml = ["Name", "Value", "Index", "Description"]
+        .map((h) => `<th>${escapeHtml(h)}</th>`)
+        .join("");
+      const bodyHtml = pointers
+        .map(
+          (row) =>
+            `<tr><td class="pointer-name">${escapeHtml(row.name)}</td><td class="pointer-value">${escapeHtml(String(row.value))}</td><td class="pointer-index">${escapeHtml(String(row.index))}</td><td class="pointer-desc">${escapeHtml(row.description || "")}</td></tr>`
+        )
+        .join("");
+      view.innerHTML = `<table class="pointers-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+    })
+    .catch((err) => {
+      view.innerHTML = `<div>${escapeHtml(String(err))}</div>`;
+    });
 }

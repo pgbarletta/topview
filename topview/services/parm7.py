@@ -18,6 +18,41 @@ logger = logging.getLogger(__name__)
 _PARM7_DESCRIPTIONS: Optional[Dict[str, str]] = None
 _PARM7_DEPRECATED: Optional[set] = None
 
+POINTER_DESCRIPTIONS = {
+    "NATOM": "Total number of atoms in the system",
+    "NTYPES": "Number of distinct atom types",
+    "NBONH": "Number of bonds containing hydrogen",
+    "MBONA": "Number of bonds without hydrogen",
+    "NTHETH": "Number of angles containing hydrogen",
+    "MTHETA": "Number of angles without hydrogen",
+    "NPHIH": "Number of dihedrals containing hydrogen",
+    "MPHIA": "Number of dihedrals without hydrogen",
+    "NHPARM": "Number of excluded atoms (currently unused)",
+    "NPARM": "Flag for parm data (1 = loaded)",
+    "NNB": "Number of nonbonded pair exclusions",
+    "NRES": "Number of residues in the system",
+    "NBONA": "Number of bonds without hydrogen (MBONA copy)",
+    "NTHETA": "Number of angles without hydrogen (MTHETA copy)",
+    "NPHIA": "Number of dihedrals without hydrogen (MPHIA copy)",
+    "NUMBND": "Number of unique bond force constants",
+    "NUMANG": "Number of unique angle force constants",
+    "NPTRA": "Number of unique dihedral parameter sets",
+    "NATYP": "Number of atom type definitions for nonbonded parameters",
+    "NPHB": "Number of unique 10-12 hydrogen bond parameters",
+    "IFPERT": "Flag for perturbation info (1 = present)",
+    "NBPER": "Number of perturbed bonds",
+    "NGPER": "Number of perturbed angles",
+    "NDPER": "Number of perturbed dihedrals",
+    "MBPER": "Number of perturbed bond parameters",
+    "MGPER": "Number of perturbed angle parameters",
+    "MDPER": "Number of perturbed dihedral parameters",
+    "IFBOX": "Periodic box type (0 = none, 1 = truncated octahedron, 2 = orthorhombic, 3 = other)",
+    "NMXRS": "Number of atoms in the largest residue",
+    "IFCAP": "Cap option flag (1 = solvent cap present)",
+    "NUMEXTRA": "Number of extra points (non-atom charge sites)",
+    "NCOPY": "Number of PDB residue sequence entries",
+}
+
 POINTER_NAMES = [
     "NATOM",
     "NTYPES",

@@ -9,7 +9,7 @@ import {
   selectFiles,
   getAllCharges,
 } from "./bridge.js";
-import { resetParm7State, renderParm7File, renderParm7Sections } from "./parm7.js";
+import { resetParm7State, renderParm7File, renderParm7Sections, showPointersTable } from "./parm7.js";
 import { selectAtom, clearSelection } from "./selection.js";
 import { state } from "./state.js";
 import {
@@ -36,7 +36,6 @@ import {
   setLoading,
   setSelectionMode,
   setStatus,
-  toggleAboutPanel,
 } from "./ui.js";
 import { decodeBase64 } from "./utils.js";
 
@@ -361,7 +360,6 @@ function attachEvents() {
   const chargesBtn = document.getElementById("toggle-charges");
   const nmrFilter = document.getElementById("nmr-filter");
   const filterBtn = document.getElementById("filter-btn");
-  const aboutBtn = document.getElementById("about-btn");
   const themeBtn = document.getElementById("theme-btn");
   const exportBtn = document.getElementById("viewer-export-btn");
   const exportScale = document.getElementById("viewer-export-scale");
@@ -409,10 +407,8 @@ function attachEvents() {
     });
   }
   if (filterBtn) filterBtn.addEventListener("click", runFilter);
-  if (aboutBtn) aboutBtn.addEventListener("click", () => {
-    toggleAboutPanel();
-    resizeViewer(false);
-  });
+  const pointersBtn = document.getElementById("parm7-pointers-btn");
+  if (pointersBtn) pointersBtn.addEventListener("click", showPointersTable);
   if (themeBtn) themeBtn.addEventListener("click", () => applyTheme(!state.darkMode));
   if (styleSelect) {
     styleSelect.addEventListener("change", (event) => {

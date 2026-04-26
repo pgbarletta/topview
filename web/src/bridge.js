@@ -75,6 +75,11 @@ export function getParm7Sections() {
 }
 
 /** @returns {Promise<any>} */
+export function getParm7Pointers() {
+  return callApi("get_parm7_pointers");
+}
+
+/** @returns {Promise<any>} */
 export function getSystemInfo() {
   return callApi("get_system_info");
 }

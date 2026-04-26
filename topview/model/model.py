@@ -14,9 +14,12 @@ from topview.model.query import query_atoms
 from topview.model.state import ModelState
 from topview.services.loader import load_system_data
 from topview.services.parm7 import (
+    POINTER_DESCRIPTIONS,
+    POINTER_NAMES,
     load_parm7_deprecated_flags,
     load_parm7_descriptions,
     parse_int_tokens,
+    parse_pointers,
 )
 from topview.services.system_info import (
     build_system_info_tables,
@@ -110,6 +113,26 @@ class Model:
             ]
         sections.sort(key=lambda item: item["line"])
         return {"ok": True, "sections": sections}
+
+    def get_parm7_pointers(self) -> Dict[str, object]:
+        with self._lock:
+            if not self._state.loaded or not self._state.parm7_sections:
+                raise ModelError("not_loaded", "No parm7 sections available")
+            pointer_section = self._state.parm7_sections.get("POINTERS")
+            if not pointer_section or not pointer_section.tokens:
+                raise ModelError("parse_failed", "POINTERS section missing")
+            pointers = parse_pointers(pointer_section)
+            rows = [
+                {
+                    "name": name,
+                    "value": pointers.get(name, 0),
+                    "index": idx,
+                    "description": POINTER_DESCRIPTIONS.get(name, ""),
+                }
+                for idx, name in enumerate(POINTER_NAMES)
+                if name in pointers
+            ]
+            return {"ok": True, "pointers": rows}
 
     def get_parm7_highlights(
         self, serials: Sequence[int], mode: Optional[str] = None

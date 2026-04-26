@@ -263,10 +263,18 @@ export function renderSelectionSummary() {
     ""
   )}</div>`;
   const right = formatInteractionDetails(state.selectionMode, state.currentInteraction);
+  let ljBlock = "";
+  if (state.selectionMode === "Non-bonded" && state.selectionSerials.length === 2) {
+    const c0 = state.atomCache.get(state.selectionSerials[0]);
+    const c1 = state.atomCache.get(state.selectionSerials[1]);
+    if (c0 && c0.atom && c1 && c1.atom) {
+      ljBlock = buildNonbondedLjFormulaBlock(c0.atom, c1.atom);
+    }
+  }
   if (right) {
-    details.innerHTML = `<div class="selection-summary-grid">${left}<div class="selection-details">${right}</div></div>`;
+    details.innerHTML = `<div class="selection-summary-grid">${left}<div class="selection-details">${right}</div></div>${ljBlock}`;
   } else {
-    details.innerHTML = left;
+    details.innerHTML = `${left}${ljBlock}`;
   }
 }
 
@@ -353,85 +361,60 @@ export function updateAtomDetails(atom) {
     parm7.lj_epsilon !== null && parm7.lj_epsilon !== undefined
       ? formatNumber(parm7.lj_epsilon)
       : null;
+  const acoefText =
+    parm7.lj_a_coef !== null && parm7.lj_a_coef !== undefined
+      ? formatNumber(parm7.lj_a_coef)
+      : null;
+  const bcoefText =
+    parm7.lj_b_coef !== null && parm7.lj_b_coef !== undefined
+      ? formatNumber(parm7.lj_b_coef)
+      : null;
 
   const leftHtml = leftLines.join("");
   const rightHtml = renderInteractionTable(chargeHeaders, [
     [rawChargeCell, chargeCell, rminCell, epsilonCell],
   ]);
-  details.innerHTML = `<div class=\"atom-details-grid\"><div class=\"atom-details-column\">${leftHtml}</div><div class=\"atom-details-column\">${rightHtml}</div></div>`;
+  let ljBlock = "";
+  if (parm7.atom_type_index && acoefText !== null && bcoefText !== null) {
+    ljBlock = buildLjFormulaBlock(acoefText, bcoefText, rminCell, epsilonCell);
+  }
+  details.innerHTML = `<div class="atom-details-grid"><div class="atom-details-column">${leftHtml}</div><div class="atom-details-column">${rightHtml}</div></div>${ljBlock}`;
 }
 
-/**
- * Update the About panel content.
- * @param {object|null} atom
- */
-export function updateAboutPanel(atom) {
-  const panel = document.getElementById("about-panel");
-  const content = document.getElementById("about-content");
-  if (!panel || !content) {
-    return;
-  }
-  if (!state.aboutVisible) {
-    return;
-  }
-  if (!atom) {
-    content.textContent = "Select an atom to see the calculation details.";
-    return;
-  }
-  const parm7 = atom.parm7 || {};
-  const atomLabel = `Atom #${atom.serial} ${atom.atom_name || ""}`.trim();
-  const rawCharge =
-    typeof parm7.charge_raw === "string" ? parm7.charge_raw.trim() : parm7.charge_raw;
-  const rawChargeText = formatNumber(rawCharge);
-  const chargeText = formatNumber(parm7.charge_e);
-  const chargeExample =
-    rawChargeText !== null && chargeText !== null
-      ? `charge (e) = charge_raw / ${CHARGE_SCALE} = ${rawChargeText} / ${CHARGE_SCALE} = ${chargeText} e`
-      : null;
-
-  const typeIndex = parm7.atom_type_index;
-  const acoefText = formatNumber(parm7.lj_a_coef);
-  const bcoefText = formatNumber(parm7.lj_b_coef);
-  const rminText = formatNumber(parm7.lj_rmin);
-  const epsilonText = formatNumber(parm7.lj_epsilon);
-  let ljExample = null;
-  if (typeIndex && acoefText !== null && bcoefText !== null) {
-  const rminExample =
-    rminText !== null ? `Rmin/2 = ${rminText} Angstrom` : "Rmin/2 N/A";
-    const epsilonExample =
-      epsilonText !== null ? `epsilon = ${epsilonText} kcal/mol` : "epsilon N/A";
-    ljExample = `A = ${acoefText}, B = ${bcoefText}. ${rminExample}, ${epsilonExample}.`;
-  }
-  const headerParts = [atomLabel];
-  if (typeIndex) {
-    headerParts.push(`Type index: ${typeIndex}`);
-  }
-  const headerLine = headerParts.join(", ");
-
-  content.innerHTML = `
-    <div><strong>${escapeHtml(headerLine)}</strong></div>
-    ${chargeExample ? `<div class="about-formula">${escapeHtml(chargeExample)}</div>` : ""}
+function buildLjFormulaBlock(acoefText, bcoefText, rminText, epsilonText) {
+  const rminPart = rminText !== null ? `Rmin/2 = ${rminText} Angstrom` : "Rmin/2 N/A";
+  const epsPart = epsilonText !== null ? `epsilon = ${epsilonText} kcal/mol` : "epsilon N/A";
+  return `<div class="lj-formula-block">
     <div>Rmin/2 and epsilon use diagonal LJ parameters from LENNARD_JONES_ACOEF and LENNARD_JONES_BCOEF via NONBONDED_PARM_INDEX.</div>
     <div class="about-formula">Rmin/2 = (2 * A / B)^(1/6) / 2, epsilon = B^2 / (4 * A)</div>
-    ${ljExample ? `<div>${escapeHtml(ljExample)}</div>` : ""}
-  `;
+    <div>A = ${escapeHtml(acoefText)}, B = ${escapeHtml(bcoefText)} → ${rminPart}, ${epsPart}.</div>
+  </div>`;
 }
 
-/**
- * Toggle the About panel visibility.
- */
-export function toggleAboutPanel() {
-  state.aboutVisible = !state.aboutVisible;
-  const panel = document.getElementById("about-panel");
-  if (!panel) {
-    return;
+function buildNonbondedLjFormulaBlock(atom1, atom2) {
+  const p1 = atom1.parm7 || {};
+  const p2 = atom2.parm7 || {};
+  const r1 = p1.lj_rmin;
+  const e1 = p1.lj_epsilon;
+  const r2 = p2.lj_rmin;
+  const e2 = p2.lj_epsilon;
+  if (r1 == null || e1 == null || r2 == null || e2 == null) {
+    return "";
   }
-  if (state.aboutVisible) {
-    panel.classList.remove("hidden");
-    updateAboutPanel(state.currentAtomInfo);
-  } else {
-    panel.classList.add("hidden");
+  const r1Text = formatNumber(r1);
+  const e1Text = formatNumber(e1);
+  const r2Text = formatNumber(r2);
+  const e2Text = formatNumber(e2);
+  if (r1Text === null || e1Text === null || r2Text === null || e2Text === null) {
+    return "";
   }
+  const label1 = `#${atom1.serial} ${atom1.atom_name || ""}`.trim();
+  const label2 = `#${atom2.serial} ${atom2.atom_name || ""}`.trim();
+  return `<div class="lj-formula-block">
+    <div>Non-bonded LJ combining rules: Rmin/2_ij = Rmin/2_1 + Rmin/2_2, epsilon_ij = sqrt(eps_1 * eps_2).</div>
+    <div>Atom ${escapeHtml(label1)}: Rmin/2 = ${escapeHtml(r1Text)} Angstrom, eps = ${escapeHtml(e1Text)} kcal/mol.</div>
+    <div>Atom ${escapeHtml(label2)}: Rmin/2 = ${escapeHtml(r2Text)} Angstrom, eps = ${escapeHtml(e2Text)} kcal/mol.</div>
+  </div>`;
 }
 
 /**

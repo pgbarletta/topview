@@ -616,24 +616,19 @@ body.dark-mode {
   display: none;
 }
 
-.about-panel,
-#about-panel {
+.about-formula {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.lj-formula-block {
   border: 1px solid var(--border);
   background: var(--panel-muted-bg);
   padding: 8px;
   font-size: var(--info-pop-font-size);
   line-height: 1.4;
-}
-
-#about-panel h3 {
-  margin: 0 0 6px;
-  font-size: 12px;
-}
-
-.about-formula {
-  font-family: "Consolas", "Courier New", monospace;
-  font-size: 11px;
-  color: var(--muted);
+  margin-top: 8px;
 }
 
 .atom-details-grid {
@@ -835,4 +830,54 @@ body.dark-mode {
 
 .status-loading {
   color: #b26b00;
+}
+
+#parm7-pointers-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.pointers-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--info-pop-font-size);
+}
+
+.pointers-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pointers-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pointer-name {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pointer-value {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  text-align: right;
+}
+
+.pointer-index {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.pointer-desc {
+  color: var(--muted);
+  font-size: 11px;
 }

@@ -33,7 +33,6 @@ export const state = {
   sectionTooltip: null,
   zoomHandlerAttached: false,
   currentAtomInfo: null,
-  aboutVisible: false,
   darkMode: true,
   eventsAttached: false,
   currentInteraction: null,

@@ -380,6 +380,17 @@ class Api:
             logger.exception("get_parm7_sections unexpected error")
             return error_result("unexpected", "Unexpected error", str(exc))
 
+    def get_parm7_pointers(self, payload: Optional[Dict[str, object]] = None):
+        try:
+            logger.debug("get_parm7_pointers requested")
+            return self._model.get_parm7_pointers()
+        except ModelError as exc:
+            logger.exception("get_parm7_pointers failed")
+            return exc.to_result()
+        except Exception as exc:
+            logger.exception("get_parm7_pointers unexpected error")
+            return error_result("unexpected", "Unexpected error", str(exc))
+
     def get_system_info(self, payload: Optional[Dict[str, object]] = None):
         """Return system info tables for the Info panel.
 

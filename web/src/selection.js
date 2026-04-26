@@ -24,7 +24,6 @@ import {
   setSelectionMode,
   setStatus,
   reportError,
-  updateAboutPanel,
 } from "./ui.js";
 
 const SOURCE_VIEWER = "viewer";
@@ -76,7 +75,6 @@ function beginSelection(serials, mode, source) {
   state.currentAtomInfo = null;
   state.currentInteraction = null;
   renderSelectionSummaryAndResize();
-  updateAboutPanel(null);
   highlightSerials(cleanSerials);
   updateSystemInfoHighlight(state.selectionMode, null, null);
   return nonce;
@@ -88,7 +86,6 @@ function applyAtomDetails(nonce, atom, highlights) {
   }
   state.currentAtomInfo = atom;
   renderSelectionSummaryAndResize();
-  updateAboutPanel(atom);
   const selection = state.selectionSerials.length ? state.selectionSerials : [atom.serial];
   highlightSerials(selection);
   updateSystemInfoHighlight(state.selectionMode, null, atom);
@@ -114,8 +111,21 @@ function applyInteractionDetails(nonce, mode, serials) {
     if (!isSelectionCurrent(nonce)) {
       return;
     }
-    fetchParm7Highlights(serials, mode)
-      .then((result) => {
+    const uncached = mode === "Non-bonded"
+      ? serials.filter((s) => !state.atomCache.has(s))
+      : [];
+    const fetchUncached = uncached.map((s) =>
+      getAtomBundle(s)
+        .then((result) => {
+          if (result && result.ok) {
+            cacheAtom(s, { atom: result.atom, highlights: result.highlights || [] });
+          }
+        })
+        .catch(() => {})
+    );
+    const highlightFetch = fetchParm7Highlights(serials, mode);
+    Promise.all([highlightFetch, ...fetchUncached])
+      .then(([result]) => {
         if (!isSelectionCurrent(nonce) || !result) {
           return;
         }
@@ -280,7 +290,6 @@ export function resetSelectionState() {
   setSelectionMode(DEFAULT_SELECTION_MODE);
   updateSystemInfoHighlight(state.selectionMode, null, null);
   renderSelectionSummaryAndResize();
-  updateAboutPanel(null);
 }
 
 /**
@@ -296,7 +305,6 @@ export function clearSelection() {
   setSelectionMode(DEFAULT_SELECTION_MODE);
   updateSystemInfoHighlight(state.selectionMode, null, null);
   renderSelectionSummaryAndResize();
-  updateAboutPanel(null);
   renderParm7File([]);
 }
 
