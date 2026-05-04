@@ -364,6 +364,7 @@ function attachEvents() {
   const exportBtn = document.getElementById("viewer-export-btn");
   const exportScale = document.getElementById("viewer-export-scale");
   const styleSelect = document.getElementById("viewer-style-select");
+  const selectionModeSelect = document.getElementById("selection-mode-select");
   if (openBtn) openBtn.addEventListener("click", handleOpenDialog);
   if (loadBtn) loadBtn.addEventListener("click", loadFromInputs);
   if (clearBtn) clearBtn.addEventListener("click", clearSelection);
@@ -413,6 +414,13 @@ function attachEvents() {
   if (styleSelect) {
     styleSelect.addEventListener("change", (event) => {
       applyViewerStylePreset(event.target.value);
+    });
+  }
+  if (selectionModeSelect) {
+    selectionModeSelect.addEventListener("change", (event) => {
+      const value = event.target.value;
+      state.selectionModeOverride = value === "default" ? null : value;
+      clearSelection();
     });
   }
   if (exportBtn) {

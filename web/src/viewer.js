@@ -952,7 +952,8 @@ function highlightSerials2d(serials) {
   const selection = serials || [];
   clear2dHighlights();
   const smallSelection = selection.length > 0 && selection.length <= 4;
-  if (smallSelection) {
+  const multiAtomMode = state.selectionModeOverride === "Atom" && state.selectionMode === "Atom";
+  if (smallSelection || multiAtomMode) {
     if (state.selectionMode === "Atom") {
       selection.forEach((serial) => {
         const atom = state.atomBySerial.get(serial);
@@ -1050,7 +1051,8 @@ export function highlightSerials(serials) {
   renderPersistentViewerOverlays();
   const selection = serials || [];
   const smallSelection = selection.length > 0 && selection.length <= 4;
-  if (smallSelection) {
+  const multiAtomMode = state.selectionModeOverride === "Atom" && state.selectionMode === "Atom";
+  if (smallSelection || multiAtomMode) {
     if (state.selectionMode === "Atom") {
       const labelStyle = getLabelStyle();
       selection.forEach((serial) => {

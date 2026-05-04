@@ -43,6 +43,7 @@ export const state = {
   selectionNonce: 0,
   selectionSerials: [],
   selectionMode: DEFAULT_SELECTION_MODE,
+  selectionModeOverride: null,
   hideWater: false,
   hideHydrogen: false,
   showCharges: false,

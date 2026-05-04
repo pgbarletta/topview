@@ -278,6 +278,68 @@ export function cacheAtom(serial, payload) {
   }
 }
 
+function applyMultiAtomDetails(nonce, serials) {
+  if (!isSelectionCurrent(nonce)) {
+    return;
+  }
+  state.currentAtomInfo = null;
+  renderSelectionSummaryAndResize();
+  highlightSerials(serials);
+  updateSystemInfoHighlight(state.selectionMode, null, null);
+  fetchParm7Highlights(serials, state.selectionMode)
+    .then((result) => {
+      if (!isSelectionCurrent(nonce) || !result) {
+        return;
+      }
+      applyParm7SelectionHighlights(state.selectionMode, result.highlights || []);
+      renderSelectionSummaryAndResize();
+    })
+    .catch(() => {});
+}
+
+function fetchAtomForMultiSelect(serial, nonce) {
+  setStatus("loading", `Loading atom ${serial}...`);
+  window.setTimeout(() => {
+    if (!isSelectionCurrent(nonce)) {
+      return;
+    }
+    getAtomBundle(serial)
+      .then((result) => {
+        if (!result || !result.ok) {
+          const msg = result && result.error ? result.error.message : "Unknown error";
+          reportError(msg);
+          return;
+        }
+        cacheAtom(serial, { atom: result.atom, highlights: result.highlights || [] });
+        if (!isSelectionCurrent(nonce)) {
+          return;
+        }
+        applyMultiAtomDetails(nonce, state.selectionSerials);
+        setStatus("success", `Selected atom ${serial}`);
+      })
+      .catch(() => {
+        getAtomInfo(serial)
+          .then((fallback) => {
+            if (!fallback || !fallback.ok) {
+              const msg =
+                fallback && fallback.error ? fallback.error.message : "Unknown error";
+              reportError(msg);
+              return;
+            }
+            cacheAtom(serial, { atom: fallback.atom, highlights: null });
+            if (!isSelectionCurrent(nonce)) {
+              return;
+            }
+            applyMultiAtomDetails(nonce, state.selectionSerials);
+            setStatus("success", `Selected atom ${serial}`);
+          })
+          .catch((err) => {
+            reportError(String(err));
+          });
+      });
+  }, 0);
+}
+
 /**
  * Reset selection state and summary UI.
  */
@@ -314,6 +376,31 @@ export function clearSelection() {
  */
 export function selectAtom(serial) {
   if (state.loading) {
+    return;
+  }
+  if (state.selectionModeOverride === "Atom") {
+    let nextSerials = state.selectionSerials.slice();
+    const idx = nextSerials.indexOf(serial);
+    if (idx >= 0) {
+      nextSerials.splice(idx, 1);
+    } else {
+      nextSerials.push(serial);
+    }
+    if (!nextSerials.length) {
+      clearSelection();
+      return;
+    }
+    state.lastAtomClick = true;
+    const nonce = beginSelection(nextSerials, "Atom", SOURCE_VIEWER);
+    if (!nonce) {
+      return;
+    }
+    const needsFetch = idx < 0 && !state.atomCache.has(serial);
+    if (needsFetch) {
+      fetchAtomForMultiSelect(serial, nonce);
+    } else {
+      applyMultiAtomDetails(nonce, nextSerials);
+    }
     return;
   }
   const next = computeViewerSelection(serial);

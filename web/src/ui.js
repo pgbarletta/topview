@@ -248,6 +248,10 @@ export function renderSelectionSummary() {
     return;
   }
   let displaySerials = state.selectionSerials;
+  if (state.selectionMode === "Atom" && state.selectionModeOverride === "Atom" && state.selectionSerials.length > 1) {
+    renderMultiAtomDetails(state.selectionSerials);
+    return;
+  }
   if (state.selectionMode === "Atom" && state.currentAtomInfo) {
     updateAtomDetails(state.currentAtomInfo);
     return;
@@ -325,6 +329,32 @@ export function renderSelectionSummary() {
   } else {
     details.innerHTML = `${left}${ljBlock}`;
   }
+}
+
+function renderMultiAtomDetails(serials) {
+  const details = document.getElementById("atom-details");
+  if (!details) {
+    return;
+  }
+  const count = serials.length;
+  const headers = ["#", "Serial", "Atom", "Element", "Residue", "Mass (g/mol)", "Charge (e)", "Rmin/2 (\u00C5)", "Epsilon (kcal/mol)"];
+  const rows = serials.map((serial, idx) => {
+    const cached = state.atomCache.get(serial);
+    if (!cached || !cached.atom) {
+      return [String(idx + 1), String(serial), "Loading...", "", "", "", "", "", ""];
+    }
+    const atom = cached.atom;
+    const residue = atom.residue || {};
+    const parm7 = atom.parm7 || {};
+    const resLabel = `${residue.resname || ""} (${residue.resid || ""})`;
+    const mass = parm7.mass != null ? formatNumber(parm7.mass) : null;
+    const charge = parm7.charge_e != null ? formatNumber(parm7.charge_e) : (parm7.charge != null ? formatNumber(parm7.charge) : null);
+    const rmin = parm7.lj_rmin != null ? formatNumber(parm7.lj_rmin) : null;
+    const epsilon = parm7.lj_epsilon != null ? formatNumber(parm7.lj_epsilon) : null;
+    return [String(idx + 1), String(serial), atom.atom_name || "", atom.element || "", resLabel, mass, charge, rmin, epsilon];
+  });
+  const tableHtml = renderInteractionTable(headers, rows);
+  details.innerHTML = `<div class="selection-summary"><div>${count} atom${count !== 1 ? "s" : ""} selected</div></div>${tableHtml}`;
 }
 
 /**
