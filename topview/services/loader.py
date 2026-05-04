@@ -22,7 +22,7 @@ from topview.services.nmr_restraints import (
     parse_nmr_restraints,
     summarize_nmr_restraints,
 )
-from topview.services.parm7 import describe_section, parse_parm7, parse_pointers
+from topview.services.parm7 import describe_section, parse_int_tokens, parse_parm7, parse_pointers
 from topview.services.pdb_writer import write_pdb
 
 logger = logging.getLogger(__name__)
@@ -362,6 +362,22 @@ def _safe_attr(atoms, attr: str) -> Optional[List[object]]:
 
 def _is_resname_all(resname: Optional[str]) -> bool:
     return (resname or "").strip().lower() == RESNAME_ALL
+
+
+def _extract_bond_pairs(
+    parm7_sections: Dict[str, Parm7Section],
+) -> List[Tuple[int, int]]:
+    bonds: List[Tuple[int, int]] = []
+    for section_name in ("BONDS_INC_HYDROGEN", "BONDS_WITHOUT_HYDROGEN"):
+        section = parm7_sections.get(section_name)
+        if not section or not section.tokens:
+            continue
+        values = parse_int_tokens(section.tokens)
+        for i in range(0, len(values) - 2, 3):
+            sa = abs(values[i]) // 3 + 1
+            sb = abs(values[i + 1]) // 3 + 1
+            bonds.append((sa, sb))
+    return bonds
 
 
 def _compute_lj_tables(
@@ -901,8 +917,9 @@ def load_system_data_3d(
         residue_keys_by_resid_setdefault(resid, []).append(residue_key)
 
     meta_build_time = time.perf_counter() - build_start
+    bond_pairs = _extract_bond_pairs(parm7_sections)
     pdb_start = time.perf_counter()
-    pdb_text = write_pdb(meta_list)
+    pdb_text = write_pdb(meta_list, bonds=bond_pairs)
     pdb_time = time.perf_counter() - pdb_start
     pdb_b64 = base64.b64encode(pdb_text.encode("ascii")).decode("ascii")
 

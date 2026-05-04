@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List
+from collections import defaultdict
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from topview.errors import PdbWriterError
 
@@ -30,13 +31,18 @@ def _format_element(element: str) -> str:
     return element[0].upper() + element[1].lower()
 
 
-def write_pdb(atom_metas: Iterable[object]) -> str:
+def write_pdb(
+    atom_metas: Iterable[object],
+    bonds: Optional[Sequence[Tuple[int, int]]] = None,
+) -> str:
     """Build a PDB text block for a sequence of atom metadata.
 
     Parameters
     ----------
     atom_metas
         Iterable of AtomMeta-like objects with serial, atom_name, residue, coords, element.
+    bonds
+        Optional sequence of (serial_a, serial_b) tuples for CONECT records.
 
     Returns
     -------
@@ -79,5 +85,20 @@ def write_pdb(atom_metas: Iterable[object]) -> str:
             f"{element:>2}"
         )
         lines.append(line)
+
+    if bonds:
+        adjacency: Dict[int, List[int]] = defaultdict(list)
+        for sa, sb in bonds:
+            adjacency[sa].append(sb)
+            adjacency[sb].append(sa)
+        for sa in sorted(adjacency):
+            partners = sorted(set(adjacency[sa]))
+            for i in range(0, len(partners), 4):
+                chunk = partners[i:i + 4]
+                conect = f"CONECT{sa:5d}"
+                for sb in chunk:
+                    conect += f"{sb:5d}"
+                lines.append(conect)
+
     lines.append("END")
     return "\n".join(lines) + "\n"
