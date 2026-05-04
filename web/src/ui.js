@@ -1,7 +1,7 @@
 import { logClientError } from "./bridge.js";
 import { CHARGE_SCALE } from "./constants.js";
 import { state } from "./state.js";
-import { escapeHtml, formatNumber } from "./utils.js";
+import { escapeHtml, formatNumber, distance, angleDegrees, dihedralDegrees } from "./utils.js";
 
 /**
  * Update the status bar contents.
@@ -90,6 +90,49 @@ export function renderInteractionTable(headers, rows) {
   return `<table class="interaction-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
 }
 
+function _computeMeasurement(mode, interaction) {
+  if (state.viewMode !== "3d") {
+    return null;
+  }
+  let serials = null;
+  if (mode === "Bond" && Array.isArray(interaction.bonds) && interaction.bonds.length) {
+    serials = interaction.bonds[0].serials;
+  } else if (mode === "Angle" && Array.isArray(interaction.angles) && interaction.angles.length) {
+    serials = interaction.angles[0].serials;
+  } else if (mode === "Dihedral" && Array.isArray(interaction.dihedrals) && interaction.dihedrals.length) {
+    serials = interaction.dihedrals[0].serials;
+  } else if (mode === "Improper" && Array.isArray(interaction.dihedrals) && interaction.dihedrals.length) {
+    serials = interaction.dihedrals[0].serials;
+  } else if (mode === "1-4 Nonbonded" && Array.isArray(interaction.one_four) && interaction.one_four.length) {
+    serials = interaction.one_four[0].serials;
+  } else if (mode === "Non-bonded" && interaction.nonbonded && interaction.nonbonded.serials) {
+    serials = interaction.nonbonded.serials;
+  }
+  if (!serials || !serials.length) {
+    return null;
+  }
+  const positions = serials.map((s) => {
+    const atom = state.atomBySerial.get(s);
+    return atom ? { x: atom.x, y: atom.y, z: atom.z } : null;
+  });
+  if (positions.some((p) => !p)) {
+    return null;
+  }
+  if ((mode === "Bond" || mode === "1-4 Nonbonded" || mode === "Non-bonded") && positions.length === 2) {
+    const d = distance(positions[0], positions[1]);
+    return d !== null ? formatNumber(d) + " \u00C5" : null;
+  }
+  if (mode === "Angle" && positions.length === 3) {
+    const a = angleDegrees(positions[0], positions[1], positions[2]);
+    return a !== null ? formatNumber(a) + "\u00B0" : null;
+  }
+  if ((mode === "Dihedral" || mode === "Improper") && positions.length === 4) {
+    const d = dihedralDegrees(positions[0], positions[1], positions[2], positions[3]);
+    return d !== null ? formatNumber(d) + "\u00B0" : null;
+  }
+  return null;
+}
+
 /**
  * Format interaction details for the selection summary.
  * @param {string} mode
@@ -100,20 +143,22 @@ export function formatInteractionDetails(mode, interaction) {
   if (!interaction || interaction.mode !== mode) {
     return "";
   }
+  const measured = _computeMeasurement(mode, interaction);
+  const measuredCol = measured || null;
   let headers = [];
   const rows = [];
   if (mode === "Bond") {
-    headers = ["k", "r0"];
+    headers = ["k", "r0", "Measured"];
     (interaction.bonds || []).forEach((bond) => {
-      rows.push([formatNumber(bond.force_constant), formatNumber(bond.equil_value)]);
+      rows.push([formatNumber(bond.force_constant), formatNumber(bond.equil_value), measuredCol]);
     });
   } else if (mode === "Angle") {
-    headers = ["k", "theta0"];
+    headers = ["k", "theta0", "Measured"];
     (interaction.angles || []).forEach((angle) => {
-      rows.push([formatNumber(angle.force_constant), formatNumber(angle.equil_value)]);
+      rows.push([formatNumber(angle.force_constant), formatNumber(angle.equil_value), measuredCol]);
     });
   } else if (mode === "Dihedral") {
-    headers = ["k", "n", "phase", "SCEE", "SCNB"];
+    headers = ["k", "n", "phase", "SCEE", "SCNB", "Measured"];
     (interaction.dihedrals || []).forEach((term) => {
       rows.push([
         formatNumber(term.force_constant),
@@ -121,10 +166,11 @@ export function formatInteractionDetails(mode, interaction) {
         formatNumber(term.phase),
         formatNumber(term.scee),
         formatNumber(term.scnb),
+        measuredCol,
       ]);
     });
   } else if (mode === "Improper") {
-    headers = ["k", "n", "phase", "SCEE", "SCNB"];
+    headers = ["k", "n", "phase", "SCEE", "SCNB", "Measured"];
     (interaction.dihedrals || []).forEach((term) => {
       rows.push([
         formatNumber(term.force_constant),
@@ -132,10 +178,11 @@ export function formatInteractionDetails(mode, interaction) {
         formatNumber(term.phase),
         formatNumber(term.scee),
         formatNumber(term.scnb),
+        measuredCol,
       ]);
     });
   } else if (mode === "1-4 Nonbonded") {
-    headers = ["SCEE", "SCNB", "Rmin", "eps", "A", "B"];
+    headers = ["SCEE", "SCNB", "Rmin", "eps", "A", "B", "Measured"];
     const nb = interaction.nonbonded || null;
     const rmin = nb ? formatNumber(nb.rmin) : null;
     const eps = nb ? formatNumber(nb.epsilon) : null;
@@ -150,10 +197,11 @@ export function formatInteractionDetails(mode, interaction) {
         eps,
         acoef,
         bcoef,
+        measuredCol,
       ]);
     });
   } else if (mode === "Non-bonded") {
-    headers = ["Rmin", "eps", "A", "B"];
+    headers = ["Rmin", "eps", "A", "B", "Measured"];
     const nb = interaction.nonbonded || null;
     if (nb) {
       rows.push([
@@ -161,6 +209,7 @@ export function formatInteractionDetails(mode, interaction) {
         formatNumber(nb.epsilon),
         formatNumber(nb.acoef),
         formatNumber(nb.bcoef),
+        measuredCol,
       ]);
     }
   }
