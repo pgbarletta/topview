@@ -9,8 +9,10 @@ import pytest
 from topview.model import Model
 from topview.services.loader import (
     _build_rdkit_depiction,
+    _build_rdkit_depiction_from_atoms,
     _infer_bond_order_from_atom_types,
     _infer_bond_order_from_req,
+    _is_resname_all,
     load_system_data,
 )
 from topview.services.parm7 import parse_parm7
@@ -263,3 +265,65 @@ def test_double_bond_fallback_to_req() -> None:
     depiction, _, _ = _build_rdkit_depiction(residue, "LIG")
     svg = depiction["svg"]
     assert "OH" not in svg
+
+
+def test_is_resname_all() -> None:
+    assert _is_resname_all("all") is True
+    assert _is_resname_all("ALL") is True
+    assert _is_resname_all("All") is True
+    assert _is_resname_all(" all ") is True
+    assert _is_resname_all("LIG") is False
+    assert _is_resname_all(None) is False
+    assert _is_resname_all("") is False
+
+
+def test_parm7_all_residues_2d_depiction() -> None:
+    pytest.importorskip("rdkit")
+    parm7_path = Path(__file__).resolve().parents[1] / "tests" / "data" / "wcn.parm7"
+    assert parm7_path.exists()
+    from topview.services.parm7 import parse_parm7, parse_pointers
+    _, sections = parse_parm7(str(parm7_path))
+    pointers = parse_pointers(sections.get("POINTERS"))
+    natom = int(pointers.get("NATOM", 0))
+    if natom > 500:
+        pytest.skip(f"System too large for 2D 'all' depiction ({natom} atoms)")
+    result = load_system_data(str(parm7_path), rst7_path=None, resname="all")
+    assert result.view_mode == "2d"
+    assert result.depiction
+    assert result.depiction.get("svg")
+    assert result.depiction.get("atom_serials")
+    assert result.depiction.get("resname") == "ALL"
+    assert result.depiction.get("resid") == 0
+
+
+def test_build_rdkit_depiction_from_atoms_disconnected() -> None:
+    pytest.importorskip("rdkit")
+
+    residue_a = SimpleNamespace(number=1, idx=0, name="LIG")
+    atom_c = SimpleNamespace(
+        idx=0, name="C1", atomic_number=6, element="C", type="c3", residue=residue_a,
+    )
+    atom_o = SimpleNamespace(
+        idx=1, name="O1", atomic_number=8, element="O", type="oh", residue=residue_a,
+    )
+    residue_a.atoms = [atom_c, atom_o]
+    residue_a.bonds = []
+
+    residue_b = SimpleNamespace(number=2, idx=1, name="WAT")
+    atom_h1 = SimpleNamespace(
+        idx=2, name="H1", atomic_number=1, element="H", type="hw", residue=residue_b,
+    )
+    atom_h2 = SimpleNamespace(
+        idx=3, name="H2", atomic_number=1, element="H", type="hw", residue=residue_b,
+    )
+    residue_b.atoms = [atom_h1, atom_h2]
+    residue_b.bonds = []
+
+    atoms = [atom_c, atom_o, atom_h1, atom_h2]
+    depiction, coords_by_serial, _ = _build_rdkit_depiction_from_atoms(
+        atoms, [], "ALL", 0,
+    )
+    assert len(depiction["atom_serials"]) == 4
+    assert depiction["resname"] == "ALL"
+    assert depiction["resid"] == 0
+    assert depiction["svg"]

@@ -64,7 +64,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--resname",
         dest="resname",
         default=config.DEFAULT_RESNAME,
-        help="Residue name to depict when only parm7 is provided",
+        help="Residue name to depict when only parm7 is provided, or 'all' for all residues",
     )
     parser.add_argument(
         "--log-file",

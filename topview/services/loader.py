@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import MDAnalysis as mda
 from MDAnalysis.exceptions import NoDataError
 
-from topview.config import CHARGE_SCALE, DEFAULT_RESNAME
+from topview.config import CHARGE_SCALE, DEFAULT_RESNAME, RESNAME_ALL
 from topview.errors import ModelError
 from topview.model.state import AtomMeta, Parm7Section, ResidueMeta
 from topview.services.lj import compute_lj_tables
@@ -360,6 +360,10 @@ def _safe_attr(atoms, attr: str) -> Optional[List[object]]:
         return None
 
 
+def _is_resname_all(resname: Optional[str]) -> bool:
+    return (resname or "").strip().lower() == RESNAME_ALL
+
+
 def _compute_lj_tables(
     parm7_sections: Dict[str, Parm7Section],
     natom: int,
@@ -443,9 +447,11 @@ def _compute_lj_tables(
     return atom_type_indices, lj_by_type, lj_time
 
 
-def _build_rdkit_depiction(
-    residue,
+def _build_rdkit_depiction_from_atoms(
+    atoms: list,
+    bond_entries: list,
     resname: str,
+    resid: int,
     width: int = 600,
     height: int = 400,
 ) -> Tuple[Dict[str, object], Dict[int, Tuple[float, float, float]], float]:
@@ -461,7 +467,6 @@ def _build_rdkit_depiction(
         ) from exc
 
     start = time.perf_counter()
-    atoms = list(getattr(residue, "atoms", []) or [])
     if not atoms:
         raise ModelError("not_found", f"Residue {resname} has no atoms")
 
@@ -481,9 +486,10 @@ def _build_rdkit_depiction(
         element = getattr(atom, "element", None)
         element_symbol = str(element).strip() if element else _guess_element(name) or ""
         if not atomic_number and element_symbol:
-            atomic_number = (
-                periodic.GetAtomicNumber(element_symbol) if element_symbol else 0
-            )
+            try:
+                atomic_number = periodic.GetAtomicNumber(element_symbol)
+            except Exception:
+                atomic_number = 0
         rd_atom = Chem.Atom(int(atomic_number)) if atomic_number else Chem.Atom(0)
         rd_atom.SetNoImplicit(True)
         rd_atom.SetNumExplicitHs(0)
@@ -497,23 +503,10 @@ def _build_rdkit_depiction(
         if element_symbol:
             atom_elements_by_serial[serial] = element_symbol
 
-    bond_entries: List[object] = []
-    residue_bonds = getattr(residue, "bonds", None)
-    if residue_bonds:
-        bond_entries = list(residue_bonds)
-    else:
-        for atom in atoms:
-            bond_entries.extend(getattr(atom, "bonds", []) or [])
-
     for bond in bond_entries:
         atom1 = getattr(bond, "atom1", None)
         atom2 = getattr(bond, "atom2", None)
         if atom1 is None or atom2 is None:
-            continue
-        if (
-            getattr(atom1, "residue", None) is not residue
-            or getattr(atom2, "residue", None) is not residue
-        ):
             continue
         serial_a = int(getattr(atom1, "idx", 0)) + 1
         serial_b = int(getattr(atom2, "idx", 0)) + 1
@@ -592,12 +585,6 @@ def _build_rdkit_depiction(
         for bond in mol.GetBonds()
     ]
 
-    resid = getattr(residue, "number", None)
-    if resid is None:
-        resid = getattr(residue, "idx", 0) + 1
-    else:
-        resid = int(resid)
-
     depiction = {
         "svg": svg,
         "width": width,
@@ -611,6 +598,48 @@ def _build_rdkit_depiction(
     }
     rdkit_time = time.perf_counter() - start
     return depiction, coords_by_serial, rdkit_time
+
+
+def _build_rdkit_depiction(
+    residue,
+    resname: str,
+    width: int = 600,
+    height: int = 400,
+) -> Tuple[Dict[str, object], Dict[int, Tuple[float, float, float]], float]:
+    atoms = list(getattr(residue, "atoms", []) or [])
+    if not atoms:
+        raise ModelError("not_found", f"Residue {resname} has no atoms")
+
+    resid = getattr(residue, "number", None)
+    if resid is None:
+        resid = getattr(residue, "idx", 0) + 1
+    else:
+        resid = int(resid)
+
+    bond_entries: List[object] = []
+    residue_bonds = getattr(residue, "bonds", None)
+    if residue_bonds:
+        bond_entries = list(residue_bonds)
+    else:
+        for atom in atoms:
+            bond_entries.extend(getattr(atom, "bonds", []) or [])
+
+    filtered_bonds: List[object] = []
+    for bond in bond_entries:
+        atom1 = getattr(bond, "atom1", None)
+        atom2 = getattr(bond, "atom2", None)
+        if atom1 is None or atom2 is None:
+            continue
+        if (
+            getattr(atom1, "residue", None) is not residue
+            or getattr(atom2, "residue", None) is not residue
+        ):
+            continue
+        filtered_bonds.append(bond)
+
+    return _build_rdkit_depiction_from_atoms(
+        atoms, filtered_bonds, resname, resid, width, height,
+    )
 
 
 def _parmed_import_error_message(exc: Exception) -> str:
@@ -1017,31 +1046,37 @@ def load_system_data_2d(
         logger.debug("Topology warnings: %s", warning_messages)
         warnings.extend(warning_messages)
 
-    normalized_resname = (resname or DEFAULT_RESNAME).strip() or DEFAULT_RESNAME
-    target_residue = None
-    if residues:
-        target_residue = next(
-            (res for res in residues if res.name == normalized_resname), None
+    if _is_resname_all(resname):
+        all_bonds = list(parm.bonds) if hasattr(parm, "bonds") else []
+        depiction, coords_by_serial, rdkit_time = _build_rdkit_depiction_from_atoms(
+            atoms, all_bonds, RESNAME_ALL.upper(), 0,
         )
-    if target_residue is None and residues:
-        lowered = normalized_resname.lower()
-        target_residue = next(
-            (res for res in residues if (res.name or "").lower() == lowered), None
-        )
-    if target_residue is None:
-        raise ModelError(
-            "not_found",
-            f"Residue {normalized_resname} not found in topology",
-        )
-    if len([res for res in residues if res.name == target_residue.name]) > 1:
-        warnings.append(
-            f"Multiple residues named {target_residue.name}; using the first match"
-        )
+    else:
+        normalized_resname = (resname or DEFAULT_RESNAME).strip() or DEFAULT_RESNAME
+        target_residue = None
+        if residues:
+            target_residue = next(
+                (res for res in residues if res.name == normalized_resname), None
+            )
+        if target_residue is None and residues:
+            lowered = normalized_resname.lower()
+            target_residue = next(
+                (res for res in residues if (res.name or "").lower() == lowered), None
+            )
+        if target_residue is None:
+            raise ModelError(
+                "not_found",
+                f"Residue {normalized_resname} not found in topology",
+            )
+        if len([res for res in residues if res.name == target_residue.name]) > 1:
+            warnings.append(
+                f"Multiple residues named {target_residue.name}; using the first match"
+            )
 
-    depiction, coords_by_serial, rdkit_time = _build_rdkit_depiction(
-        target_residue,
-        target_residue.name or normalized_resname,
-    )
+        depiction, coords_by_serial, rdkit_time = _build_rdkit_depiction(
+            target_residue,
+            target_residue.name or normalized_resname,
+        )
 
     meta_list: List[AtomMeta] = []
     meta_by_serial: Dict[int, AtomMeta] = {}

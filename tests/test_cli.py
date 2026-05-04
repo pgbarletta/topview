@@ -17,6 +17,11 @@ def test_parse_args_resname_override() -> None:
     assert args.resname == "ABC"
 
 
+def test_parse_args_resname_all() -> None:
+    args = _parse_args(["topview", "example.parm7", "--resname", "all"])
+    assert args.resname == "all"
+
+
 def test_parse_args_nmr_override() -> None:
     args = _parse_args(["topview", "example.parm7", "example.rst7", "--nmr", "rest.in"])
     assert args.nmr_path == "rest.in"

@@ -235,7 +235,7 @@ class Model:
                 raise ModelError("not_loaded", "No system loaded")
             charges = {}
             for meta in self._state.meta_list:
-                if resname and meta.residue.resname != resname:
+                if resname and resname.lower() != "all" and meta.residue.resname != resname:
                     continue
                 charge = meta.parm7.get("charge")
                 charges[str(meta.serial)] = charge
