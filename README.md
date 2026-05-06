@@ -44,6 +44,12 @@ Enable debug logging to a file:
 topview file.parm7 --log-file /path/to/topview.log
 ```
 
+Export selected system-info tables to CSV in the current directory without launching the GUI:
+
+```bash
+topview file.parm7 --export=atom,bond,angle,dihedral,improper,14nonbonded,nonbonded
+```
+
 
 ## Notes
 
